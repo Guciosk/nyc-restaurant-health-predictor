@@ -51,28 +51,62 @@ def format_probabilities(prob_dict: dict):
 # 3. Convert a restaurant row into model input dictionary
 # -------------------------------------------------
 
+# All features expected by the model
+# NOTE: We use PREVIOUS inspection data to predict NEXT grade
+MODEL_FEATURES = [
+    "borough",
+    "zipcode",
+    "cuisine_description",
+    "days_since_last_inspection",
+    "inspection_frequency",
+    "prev_grade_1",
+    "prev_grade_2",
+    "prev_score_1",
+    "prev_score_2",
+    "critical_violations_12mo",
+    "total_violations_all_time",
+    "avg_score_historical",
+    "score_trend",
+    "grade_stability",
+    "cuisine_avg_score",
+    "zipcode_avg_score",
+    "violation_diversity",
+]
+
+# Required fields that must be present (for basic restaurant info)
+REQUIRED_FIELDS = [
+    "borough",
+    "zipcode",
+    "cuisine_description",
+]
+
+
 def row_to_model_input(row: pd.Series):
     """
     Take a row from the restaurant dataset and extract
-    the 5 features expected by the model.
+    all features expected by the model.
 
-    Features: borough, zipcode, cuisine_description, critical_flag_bin, score
+    Required: borough, zipcode, cuisine_description
+    Optional: All historical/computed features (will use defaults if missing)
     """
-
-    required_fields = [
-        "borough",
-        "zipcode",
-        "cuisine_description",
-        "critical_flag_bin",
-        "score",
-    ]
+    # Check required fields
+    for field in REQUIRED_FIELDS:
+        if field not in row:
+            raise KeyError(f"Missing required field: {field}. Available: {list(row.index)}")
 
     data = {}
 
-    for field in required_fields:
-        if field not in row:
-            raise KeyError(f"Missing required field: {field}. Available: {list(row.index)}")
-        data[field] = row[field]
+    for field in MODEL_FEATURES:
+        if field in row.index:
+            value = row[field]
+            # Handle NaN values
+            if pd.isna(value):
+                data[field] = None
+            else:
+                data[field] = value
+        else:
+            # Field not present - predictor will use defaults
+            data[field] = None
 
     return data
 

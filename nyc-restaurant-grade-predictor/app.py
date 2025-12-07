@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+from datetime import datetime
 
-from src.data_loader import get_data, refresh_data
-from src.predictor import predict_restaurant_grade
+from src.data_loader import get_data, get_raw_data, refresh_data, load_training_data, clear_data_cache
+from src.predictor import predict_restaurant_grade, clear_model_cache, get_model_metadata, model_needs_retraining, ModelNeedsRetrainingError
+from src.feature_engineering import compute_all_features
+from src.trainer import train_model, save_model, get_feature_importance_ranking
 from src.utils import (
     get_grade_color,
     format_probabilities,
@@ -35,9 +38,30 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
+    /* Reduce top padding */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+
+    /* Tighter header spacing */
+    header[data-testid="stHeader"] {
+        height: 2.5rem !important;
+    }
+
+    /* Reduce main title margin */
+    h1 {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
     /* Headings */
     h1, h2, h3 {
         font-weight: 600 !important;
+    }
+
+    h2, h3 {
+        margin-top: 0.5rem !important;
     }
 
     /* Button styling */
@@ -109,11 +133,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("CleanKitchen NYC")
-st.markdown(
-    "Explore NYC restaurant inspections and get **AI-powered grade predictions** "
-    "based on real inspection data."
-)
+st.markdown("""
+<div style="margin-top: 2rem; margin-bottom: 0.5rem;">
+    <span style="font-size: 1.75rem; font-weight: 700;">CleanKitchen NYC</span>
+    <span style="color: #6C757D; margin-left: 12px;">AI-powered restaurant grade predictions</span>
+</div>
+""", unsafe_allow_html=True)
 
 
 # -------------------------------------------------
@@ -121,17 +146,16 @@ st.markdown(
 # -------------------------------------------------
 @st.cache_data
 def load_app_data():
+    """Load feature-enriched restaurant data (one row per restaurant)."""
     df = get_data()
 
-    # Normalize some text fields for filters
+    # Normalize text fields for filters (may already be done, but ensure consistency)
     df["borough"] = df["borough"].astype(str).str.strip().str.title()
     df["cuisine_description"] = df["cuisine_description"].astype(str).str.strip().str.title()
 
-    # Keep only the most recent inspection per restaurant (by camis ID)
-    if "camis" in df.columns and "inspection_date" in df.columns:
+    # Ensure inspection_date is datetime
+    if "inspection_date" in df.columns:
         df["inspection_date"] = pd.to_datetime(df["inspection_date"], errors="coerce")
-        df = df.sort_values("inspection_date", ascending=False)
-        df = df.drop_duplicates(subset=["camis"], keep="first")
 
     return df
 
@@ -205,6 +229,85 @@ if st.sidebar.button("🔄 Fetch Fresh Data"):
 
 
 # -------------------------------------------------
+# Model Management (sidebar)
+# -------------------------------------------------
+st.sidebar.divider()
+st.sidebar.caption("Model Management")
+
+# Show current model info
+try:
+    metadata = get_model_metadata()
+    training_date = metadata.get("training_date", "Unknown")
+    if training_date != "Unknown":
+        # Parse ISO format date
+        try:
+            dt = datetime.fromisoformat(training_date)
+            training_date = dt.strftime("%Y-%m-%d %H:%M")
+        except:
+            pass
+    metrics = metadata.get("training_metrics", {})
+    accuracy = metrics.get("accuracy")
+    if accuracy:
+        st.sidebar.markdown(f"**Last trained:** {training_date}")
+        st.sidebar.markdown(f"**Accuracy:** {accuracy:.1%}")
+    else:
+        st.sidebar.markdown("**Model:** Not yet trained with new features")
+except Exception:
+    st.sidebar.markdown("**Model:** Ready for training")
+
+# Training button
+if st.sidebar.button("🧠 Retrain Model"):
+    with st.sidebar:
+        progress_bar = st.progress(0, text="Loading training data...")
+
+        try:
+            # Step 1: Load raw data
+            progress_bar.progress(10, text="Loading raw inspection data...")
+            raw_df = load_training_data()
+
+            # Step 2: Compute features
+            progress_bar.progress(30, text="Computing features...")
+            feature_df = compute_all_features(raw_df)
+
+            # Step 3: Train model
+            progress_bar.progress(50, text="Training model...")
+            model, metrics, feature_importances, encoders = train_model(feature_df)
+
+            # Step 4: Save model
+            progress_bar.progress(80, text="Saving model...")
+            save_model(model, encoders, metrics, feature_importances)
+
+            # Step 5: Clear caches
+            progress_bar.progress(90, text="Clearing caches...")
+            clear_model_cache()
+            clear_data_cache()
+
+            progress_bar.progress(100, text="Complete!")
+
+            # Show results
+            st.success("Model trained successfully!")
+            st.markdown(f"""
+            **Training Results:**
+            - Accuracy: {metrics['accuracy']:.1%}
+            - Precision: {metrics['precision']:.1%}
+            - Recall: {metrics['recall']:.1%}
+            - F1 Score: {metrics['f1']:.1%}
+            - Training samples: {metrics['train_samples']:,}
+            """)
+
+            # Show top feature importances
+            st.markdown("**Top Features:**")
+            top_features = get_feature_importance_ranking(feature_importances)[:5]
+            for name, importance in top_features:
+                st.markdown(f"- {name}: {importance:.3f}")
+
+        except Exception as e:
+            st.error(f"Training failed: {e}")
+
+st.sidebar.caption("Training takes ~30 seconds")
+
+
+# -------------------------------------------------
 # MAIN LAYOUT: Map (left) + Details/Prediction (right)
 # -------------------------------------------------
 left_col, right_col = st.columns([2, 1])
@@ -233,8 +336,8 @@ with left_col:
             get_position=["longitude", "latitude"],
             get_color="color",
             get_radius=8,
-            radius_min_pixels=2,
-            radius_max_pixels=6,
+            radius_min_pixels=4,
+            radius_max_pixels=8,
             radius_scale=1,
             pickable=True,
             auto_highlight=True,
@@ -295,7 +398,7 @@ with left_col:
 
 
 with right_col:
-    st.subheader(" Inspect & Predict")
+    st.subheader("Restaurant Details")
 
     if len(df_filtered) == 0:
         st.info("Use the filters to select at least one restaurant.")
@@ -324,21 +427,77 @@ with right_col:
 
         selected_row = df_filtered.loc[selected_idx]
 
-        st.markdown("###  Selected Restaurant")
-        st.markdown(f"**Name:** {selected_row.get(name_col, 'N/A')}")
-        st.markdown(f"**Borough:** {selected_row.get('borough', 'N/A')}")
-        st.markdown(f"**ZIP:** {selected_row.get('zipcode', 'N/A')}")
-        st.markdown(f"**Cuisine:** {selected_row.get('cuisine_description', 'N/A')}")
+        # Get values
+        restaurant_name = selected_row.get(name_col, 'N/A')
+        borough = selected_row.get('borough', 'N/A')
+        zipcode = selected_row.get('zipcode', 'N/A')
+        cuisine = selected_row.get('cuisine_description', 'N/A')
+        score = display_value(selected_row.get('score'), 'N/A')
+        grade = display_value(selected_row.get('grade'), 'N/A')
+        grade_color = get_grade_color(grade if grade != 'N/A' else 'Z')
 
-        # Show existing inspection info (if present)
-        st.markdown("###  Latest Inspection Info")
-        st.markdown(f"- **Score:** {display_value(selected_row.get('score'), 'N/A')}")
-        st.markdown(f"- **Official Grade:** {display_value(selected_row.get('grade'), 'Unavailable')}")
-        if "inspection_date" in selected_row:
-            st.markdown(f"- **Inspection Date:** {selected_row.get('inspection_date')}")
+        # Format inspection date nicely
+        inspection_date = selected_row.get('inspection_date')
+        if pd.notna(inspection_date):
+            try:
+                inspection_date_str = pd.to_datetime(inspection_date).strftime('%b %d, %Y')
+            except:
+                inspection_date_str = str(inspection_date)
+        else:
+            inspection_date_str = 'N/A'
 
-        st.markdown("---")
-        st.markdown("###  Model Prediction")
+        # Restaurant info card
+        st.markdown(f"""
+        <div class="info-card">
+            <h3 style="margin: 0 0 12px 0; font-size: 1.1rem; color: #2C3E50;">{restaurant_name}</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem;">
+                <div>
+                    <span style="color: #6C757D;">Borough</span><br/>
+                    <span style="font-weight: 500;">{borough}</span>
+                </div>
+                <div>
+                    <span style="color: #6C757D;">ZIP</span><br/>
+                    <span style="font-weight: 500;">{zipcode}</span>
+                </div>
+                <div style="grid-column: span 2;">
+                    <span style="color: #6C757D;">Cuisine</span><br/>
+                    <span style="font-weight: 500;">{cuisine}</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Latest inspection card
+        st.markdown(f"""
+        <div class="info-card">
+            <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #6C757D;">Latest Inspection</h4>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="text-align: center;">
+                    <div class="grade-badge" style="background: {grade_color}; width: 48px; height: 48px; font-size: 1.3rem;">
+                        {grade}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6C757D; margin-top: 4px;">Grade</div>
+                </div>
+                <div style="flex: 1; font-size: 0.9rem;">
+                    <div style="margin-bottom: 6px;">
+                        <span style="color: #6C757D;">Score:</span>
+                        <span style="font-weight: 600; margin-left: 4px;">{score}</span>
+                    </div>
+                    <div>
+                        <span style="color: #6C757D;">Date:</span>
+                        <span style="font-weight: 500; margin-left: 4px;">{inspection_date_str}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Check if model needs retraining
+        if model_needs_retraining():
+            st.warning(
+                "**Model needs to be trained.** The prediction model has been updated with new features. "
+                "Please click **'Retrain Model'** in the sidebar to train the model before making predictions."
+            )
 
         if st.button("Predict Inspection Grade", use_container_width=True):
             with st.spinner("Analyzing restaurant data..."):
@@ -380,5 +539,9 @@ with right_col:
                         </div>
                         """, unsafe_allow_html=True)
 
+                except ModelNeedsRetrainingError:
+                    st.error(
+                        "**Model needs retraining.** Please click 'Retrain Model' in the sidebar first."
+                    )
                 except Exception as e:
                     st.error(f"Error making prediction: {e}")
