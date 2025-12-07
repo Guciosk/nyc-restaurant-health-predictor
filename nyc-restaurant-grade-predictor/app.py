@@ -492,6 +492,48 @@ with right_col:
         </div>
         """, unsafe_allow_html=True)
 
+        # Inspection History (last 5 inspections)
+        camis = selected_row.get('camis')
+        if camis:
+            raw_df = get_raw_data()
+            history = raw_df[raw_df['camis'] == camis].copy()
+            history = history.sort_values('inspection_date', ascending=False)
+            # Get unique inspections by date
+            history = history.drop_duplicates(subset=['inspection_date']).head(5)
+
+            if len(history) > 0:
+                history_items = []
+                for _, insp in history.iterrows():
+                    insp_date = insp.get('inspection_date')
+                    if pd.notna(insp_date):
+                        try:
+                            date_str = pd.to_datetime(insp_date).strftime('%b %d, %Y')
+                        except:
+                            date_str = str(insp_date)
+                    else:
+                        date_str = 'N/A'
+
+                    insp_grade = display_value(insp.get('grade'), '-')
+                    insp_score = display_value(insp.get('score'), '-')
+                    insp_color = get_grade_color(insp_grade if insp_grade != '-' else 'Z')
+
+                    history_items.append(
+                        f'<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eee;">'
+                        f'<div class="grade-badge" style="background: {insp_color}; width: 32px; height: 32px; font-size: 0.9rem;">{insp_grade}</div>'
+                        f'<div style="flex: 1; font-size: 0.85rem;">'
+                        f'<span style="font-weight: 500;">{date_str}</span>'
+                        f'<span style="color: #6C757D; margin-left: 8px;">Score: {insp_score}</span>'
+                        f'</div></div>'
+                    )
+
+                history_html = (
+                    '<div class="info-card">'
+                    '<h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #6C757D;">Inspection History</h4>'
+                    + ''.join(history_items) +
+                    '</div>'
+                )
+                st.markdown(history_html, unsafe_allow_html=True)
+
         # Check if model needs retraining
         if model_needs_retraining():
             st.warning(
