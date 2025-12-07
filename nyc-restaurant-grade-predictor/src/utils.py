@@ -5,16 +5,31 @@ import pandas as pd
 # -------------------------------------------------
 
 GRADE_COLORS = {
-    "A": "#2ECC71",   # green
-    "B": "#F1C40F",   # yellow
-    "C": "#E67E22",   # orange
-    "P": "#3498DB",   # blue (Pending)
-    "Z": "#95A5A6"    # gray (Grade Pending / Not Yet Graded)
+    "A": "#7DB87D",   # green
+    "B": "#E8C84A",   # yellow
+    "C": "#8B3A3A",   # red
+    "P": "#9BA8C4",   # blue (Pending)
+    "Z": "#D4956A",   # orange (Grade Pending / Not Yet Graded)
+}
+
+GRADE_COLORS_RGB = {
+    "A": [125, 184, 125, 200],   # green with alpha
+    "B": [232, 200, 74, 200],    # yellow
+    "C": [139, 58, 58, 200],     # red
+    "P": [155, 168, 196, 200],   # blue (Pending)
+    "Z": [212, 149, 106, 200],   # orange
 }
 
 def get_grade_color(grade: str):
     """Return the hex color associated with a grade letter."""
-    return GRADE_COLORS.get(grade, "#95A5A6")
+    return GRADE_COLORS.get(grade, "#D4956A")
+
+
+def get_grade_color_rgb(grade: str):
+    """Return RGBA list for PyDeck visualization."""
+    if pd.isna(grade):
+        return [212, 149, 106, 200]
+    return GRADE_COLORS_RGB.get(str(grade).upper(), [212, 149, 106, 200])
 
 
 # -------------------------------------------------
@@ -36,28 +51,62 @@ def format_probabilities(prob_dict: dict):
 # 3. Convert a restaurant row into model input dictionary
 # -------------------------------------------------
 
+# All features expected by the model
+# NOTE: We use PREVIOUS inspection data to predict NEXT grade
+MODEL_FEATURES = [
+    "borough",
+    "zipcode",
+    "cuisine_description",
+    "days_since_last_inspection",
+    "inspection_frequency",
+    "prev_grade_1",
+    "prev_grade_2",
+    "prev_score_1",
+    "prev_score_2",
+    "critical_violations_12mo",
+    "total_violations_all_time",
+    "avg_score_historical",
+    "score_trend",
+    "grade_stability",
+    "cuisine_avg_score",
+    "zipcode_avg_score",
+    "violation_diversity",
+]
+
+# Required fields that must be present (for basic restaurant info)
+REQUIRED_FIELDS = [
+    "borough",
+    "zipcode",
+    "cuisine_description",
+]
+
+
 def row_to_model_input(row: pd.Series):
     """
     Take a row from the restaurant dataset and extract
-    the 5 features expected by the model.
+    all features expected by the model.
 
-    Features: borough, zipcode, cuisine_description, critical_flag_bin, score
+    Required: borough, zipcode, cuisine_description
+    Optional: All historical/computed features (will use defaults if missing)
     """
-
-    required_fields = [
-        "borough",
-        "zipcode",
-        "cuisine_description",
-        "critical_flag_bin",
-        "score",
-    ]
+    # Check required fields
+    for field in REQUIRED_FIELDS:
+        if field not in row:
+            raise KeyError(f"Missing required field: {field}. Available: {list(row.index)}")
 
     data = {}
 
-    for field in required_fields:
-        if field not in row:
-            raise KeyError(f"Missing required field: {field}. Available: {list(row.index)}")
-        data[field] = row[field]
+    for field in MODEL_FEATURES:
+        if field in row.index:
+            value = row[field]
+            # Handle NaN values
+            if pd.isna(value):
+                data[field] = None
+            else:
+                data[field] = value
+        else:
+            # Field not present - predictor will use defaults
+            data[field] = None
 
     return data
 
@@ -117,4 +166,22 @@ def restaurant_popup_html(row):
     </div>
     """
     return html
+
+
+# -------------------------------------------------
+# 6. PyDeck map data preparation
+# -------------------------------------------------
+
+def prepare_map_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Prepare dataframe for PyDeck visualization with color column."""
+    map_df = df[['latitude', 'longitude', 'dba', 'grade',
+                 'cuisine_description', 'borough', 'zipcode', 'score']].copy()
+
+    map_df['color'] = map_df['grade'].apply(get_grade_color_rgb)
+    map_df['name'] = map_df['dba'].fillna('Unknown Restaurant')
+    map_df['grade_display'] = map_df['grade'].fillna('N/A')
+    map_df['score_display'] = map_df['score'].fillna('N/A').astype(str)
+    map_df = map_df.dropna(subset=['latitude', 'longitude'])
+
+    return map_df
 
