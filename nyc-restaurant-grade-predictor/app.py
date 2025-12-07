@@ -363,7 +363,7 @@ with left_col:
                 map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
             ),
             height=500,
-            use_container_width=True,
+            width='stretch',
         )
 
         # Grade legend
@@ -391,10 +391,10 @@ with left_col:
     if cols_to_show:
         st.dataframe(
             df_filtered[cols_to_show].head(300),
-            use_container_width=True
+            width='stretch'
         )
     else:
-        st.dataframe(df_filtered.head(300), use_container_width=True)
+        st.dataframe(df_filtered.head(300), width='stretch')
 
 
 with right_col:
@@ -499,7 +499,7 @@ with right_col:
                 "Please click **'Retrain Model'** in the sidebar to train the model before making predictions."
             )
 
-        if st.button("Predict Inspection Grade", use_container_width=True):
+        if st.button("Predict Inspection Grade", width='stretch'):
             with st.spinner("Analyzing restaurant data..."):
                 try:
                     # Build model input
