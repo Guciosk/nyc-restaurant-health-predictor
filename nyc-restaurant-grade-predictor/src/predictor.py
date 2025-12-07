@@ -7,6 +7,7 @@ Handles model loading, feature encoding, and predictions.
 import json
 import joblib
 import numpy as np
+import pandas as pd
 import os
 
 # -------------------------------------------------
@@ -206,7 +207,7 @@ def build_feature_vector(restaurant_data: dict) -> np.ndarray:
             except (ValueError, TypeError):
                 features.append(0.0)
 
-    return np.array([features])
+    return pd.DataFrame([features], columns=FEATURE_COLUMNS)
 
 
 # -------------------------------------------------
