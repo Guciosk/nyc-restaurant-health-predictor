@@ -5,7 +5,7 @@ from datetime import datetime
 
 from src.data_loader import get_data, get_raw_data, refresh_data, load_training_data, clear_data_cache
 from src.predictor import predict_restaurant_grade, clear_model_cache, get_model_metadata, model_needs_retraining, ModelNeedsRetrainingError
-from src.feature_engineering import compute_all_features
+from src.feature_engineering import compute_all_features, compute_training_features
 from src.trainer import train_model, save_model, get_feature_importance_ranking
 from src.utils import (
     get_grade_color,
@@ -265,9 +265,9 @@ if st.sidebar.button("🧠 Retrain Model"):
             progress_bar.progress(10, text="Loading raw inspection data...")
             raw_df = load_training_data()
 
-            # Step 2: Compute features
-            progress_bar.progress(30, text="Computing features...")
-            feature_df = compute_all_features(raw_df)
+            # Step 2: Compute features (using training-specific function for correct temporal alignment)
+            progress_bar.progress(30, text="Computing training features...")
+            feature_df = compute_training_features(raw_df)
 
             # Step 3: Train model
             progress_bar.progress(50, text="Training model...")
@@ -414,10 +414,21 @@ with right_col:
 
         df_filtered = df_filtered.reset_index(drop=True)
         options = df_filtered.index.tolist()
-        labels = [
-            f"{df_filtered.loc[i, name_col]} ({df_filtered.loc[i, 'borough']}, {df_filtered.loc[i, 'zipcode']})"
-            for i in options
-        ]
+
+        # Build labels with street name and ZIP for easy identification
+        def make_label(i):
+            name = df_filtered.loc[i, name_col]
+            street = df_filtered.loc[i, 'street'] if 'street' in df_filtered.columns else None
+            zipcode = df_filtered.loc[i, 'zipcode']
+
+            if pd.notna(street) and street not in ('nan', ''):
+                return f"{name} ({street}, {zipcode})"
+            else:
+                # Fall back to borough if no street
+                borough = df_filtered.loc[i, 'borough']
+                return f"{name} ({borough}, {zipcode})"
+
+        labels = [make_label(i) for i in options]
 
         selected_idx = st.selectbox(
             "Choose a restaurant to analyze:",
@@ -541,7 +552,7 @@ with right_col:
                 "Please click **'Retrain Model'** in the sidebar to train the model before making predictions."
             )
 
-        if st.button("Predict Inspection Grade", width='stretch'):
+        if st.button("Predict Next Inspection", width='stretch'):
             with st.spinner("Analyzing restaurant data..."):
                 try:
                     # Build model input
@@ -552,13 +563,59 @@ with right_col:
                     probabilities = result["probabilities"]
                     formatted_probs = format_probabilities(probabilities)
 
-                    color = get_grade_color(predicted_grade)
+                    # Get current inspection info
+                    current_score = selected_row.get('score')
+                    current_grade = selected_row.get('grade')
 
-                    # Prediction result card
+                    # Derive grade from score if official grade not available
+                    if pd.isna(current_grade) or current_grade not in ['A', 'B', 'C']:
+                        if pd.notna(current_score):
+                            if current_score <= 13:
+                                derived_grade = 'A'
+                            elif current_score <= 27:
+                                derived_grade = 'B'
+                            else:
+                                derived_grade = 'C'
+                            grade_status = f"{derived_grade} (pending)"
+                        else:
+                            derived_grade = None
+                            grade_status = "Pending"
+                    else:
+                        derived_grade = current_grade
+                        grade_status = current_grade
+
+                    # Calculate expected time to next inspection
+                    days_since = selected_row.get('days_since_last_inspection', 0)
+                    if pd.isna(days_since):
+                        days_since = 0
+
+                    median_interval = 124  # median days between inspections
+
+                    # Handle stale data (no inspection in over a year)
+                    if days_since > 365:
+                        years_ago = round(days_since / 365, 1)
+                        time_estimate = f"Last inspected {years_ago:.0f}+ years ago"
+                    elif days_since > median_interval:
+                        time_estimate = "Overdue for inspection"
+                    elif days_since > median_interval - 30:
+                        time_estimate = "Due within ~1 month"
+                    elif days_since > median_interval - 60:
+                        time_estimate = "Expected in ~2 months"
+                    elif days_since > median_interval - 90:
+                        time_estimate = "Expected in ~3 months"
+                    else:
+                        months = round((median_interval - days_since) / 30)
+                        time_estimate = f"Expected in ~{months} months"
+
+                    # Next inspection prediction card
+                    pred_color = get_grade_color(predicted_grade)
                     st.markdown(f"""
-                    <div class="info-card" style="text-align: center;">
-                        <p style="font-size: 0.85rem; margin-bottom: 0.5rem; color: #6C757D;">
-                            PREDICTED GRADE
+                    <div class="info-card" style="text-align: center; border: 2px solid {pred_color};">
+                        <p style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #6C757D; text-transform: uppercase;">
+                            Predicted Next Inspection
+                        </p>
+                        <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">
+                            {time_estimate}
                         </p>
                         <div class="grade-badge grade-{predicted_grade}" style="margin: 0 auto;">
                             {predicted_grade}
@@ -578,6 +635,15 @@ with right_col:
                             <div style="background: #E9ECEF; border-radius: 4px; height: 6px; overflow: hidden;">
                                 <div style="background: {grade_color}; width: {p}%; height: 100%; border-radius: 4px;"></div>
                             </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # Historical context
+                    if derived_grade == 'C' or (pd.notna(current_score) and current_score >= 28):
+                        st.markdown("""
+                        <div style="background: #F8F9FA; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; color: #6C757D;">
+                            <strong>Historical Pattern:</strong> 64% of restaurants that fail an inspection
+                            pass their re-inspection within ~4 months after addressing violations.
                         </div>
                         """, unsafe_allow_html=True)
 
