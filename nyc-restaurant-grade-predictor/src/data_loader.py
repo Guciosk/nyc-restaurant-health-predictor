@@ -1,14 +1,7 @@
 import pandas as pd
-import os
 import streamlit as st
 
-# -------------------------------------------------
-# BASE PATHS
-# -------------------------------------------------
-
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-# Use cleaned data from the root data directory
-RESTAURANT_DATA_PATH = os.path.join(BASE_DIR, "..", "data", "cleaned_restaurant_inspections.csv")
+from .data_pipeline import get_or_fetch_data, refresh_data, has_cached_data, get_cache_info
 
 
 # -------------------------------------------------
@@ -19,11 +12,13 @@ RESTAURANT_DATA_PATH = os.path.join(BASE_DIR, "..", "data", "cleaned_restaurant_
 def load_restaurant_data():
     """
     Loads the cleaned restaurant inspection dataset.
+
+    Data is fetched from NYC Open Data API if not cached locally.
     Includes: borough, zipcode, cuisine_description, score,
     critical_flag, and coordinates for mapping.
     """
-    # Read CSV with zipcode as string to preserve format
-    df = pd.read_csv(RESTAURANT_DATA_PATH, low_memory=False, dtype={'zipcode': str})
+    # Get data from pipeline (fetches from API if no cache)
+    df = get_or_fetch_data()
 
     # Rename 'boro' to 'borough' for consistency
     if 'boro' in df.columns and 'borough' not in df.columns:

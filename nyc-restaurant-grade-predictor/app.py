@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 
-from src.data_loader import get_data
+from src.data_loader import get_data, refresh_data
 from src.predictor import predict_restaurant_grade
 from src.utils import (
     get_grade_color,
@@ -186,6 +186,22 @@ st.sidebar.markdown(f"""
     <p>{len(df_filtered):,} restaurants found</p>
 </div>
 """, unsafe_allow_html=True)
+
+
+# -------------------------------------------------
+# Data Management (sidebar)
+# -------------------------------------------------
+st.sidebar.divider()
+st.sidebar.caption("Data Management")
+if st.sidebar.button("🔄 Fetch Fresh Data"):
+    with st.spinner("Fetching latest data from NYC Open Data API... This may take 1-2 minutes."):
+        success, message, count = refresh_data()
+        if success:
+            st.sidebar.success(f"{message} ({count:,} records)")
+            st.cache_data.clear()
+            st.rerun()
+        else:
+            st.sidebar.error(message)
 
 
 # -------------------------------------------------
