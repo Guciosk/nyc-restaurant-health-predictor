@@ -268,6 +268,36 @@ st.markdown("""
         margin: 40px auto;
         width: 80%;
     }
+    /*--------------- About Body ---------------*/
+    /* Newspaper Body: Two-column layout effect */
+    .newspaper-body {
+        column-count: 2; /* Main feature of the newspaper look */
+        column-gap: 30px; /* Space between columns */
+        text-align: justify; /* Justified text */
+        line-height: 1.5;
+        font-family: 'Times New Roman', Times, serif;
+        font-size: 1.05rem;
+    }
+
+    /* Ensure list items span columns correctly */
+    .newspaper-body ul, .newspaper-body p {
+        /* Prevents bullet points from breaking across columns too easily */
+        -webkit-column-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    /* Clear the column layout for titles/headers */
+    .column-clear {
+        column-span: all;
+        margin-bottom: 15px;
+        margin-top: 10px;
+        border-bottom: 1px solid #CCCCCC;
+    }
+    
+    /* Ensure the image doesn't break the columns */
+    .stImage, .stVideo, .stPlot {
+        column-span: all;
+    }
     
     </style>
 """, unsafe_allow_html=True)
@@ -1024,21 +1054,27 @@ def about_page():
     
     st.title("CleanKitchen NYC Project Analysis")
     
+    # Wrap the entire content section in the newspaper body container
+    st.markdown('<div class="newspaper-body">', unsafe_allow_html=True)
+    
     # -------------------------------------------------
-    # 🎯 Project Goal
+    #  Project Goal
     # -------------------------------------------------
-    st.markdown('<h2 style="font-size: 1.75rem;">🎯 Project Goal</h2>', unsafe_allow_html=True)
+    # Use h2 style for major sections, setting column-span=all for the header
+    st.markdown('<div class="column-clear"></div>', unsafe_allow_html=True)
+    st.markdown('<h2 style="font-size: 1.75rem;"> Project Goal</h2>', unsafe_allow_html=True)
+    
     st.markdown(
         """
         Each year, the **New York City Health Department** inspects roughly 24,000 restaurants and evaluates them on food handling, temperature control, hygiene, and vermin management. To help the public understand inspection results, the city introduced a letter-grade system in 2010, assigning each restaurant an **A, B, or C**, with **A** being the highest score. Restaurants must display this grade at their entrance so customers can easily gauge their health standards. 
         """
     )
 
-    # Image placement using the requested dimensions
+    # Image placement—this spans both columns
     st.markdown(
         f"""
         <div style="text-align: center; margin: 20px 0;">
-            <img src="https://picsum.photos/id/1/600/300">
+            <img src="https://picsum.photos/id/1/600/300" alt="NYC Health Grades" style="max-width: 100%; height: auto;">
         </div>
         """,
         unsafe_allow_html=True
@@ -1052,12 +1088,10 @@ def about_page():
         """
     )
 
-    st.markdown("---")
-
     # -------------------------------------------------
-    # 💾 Data
+    #  Data
     # -------------------------------------------------
-    st.markdown('<h2 style="font-size: 1.75rem;">💾 Data</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="font-size: 1.75rem;"> Data</h2>', unsafe_allow_html=True)
     st.markdown(
         """
         NYC publishes all restaurant inspection results through its public database on **NYC Open Data**. These downloadable text files include:
@@ -1073,6 +1107,7 @@ def about_page():
         """
     )
     
+    st.markdown('<div class="column-clear"></div>', unsafe_allow_html=True)
     st.subheader("Data Preparation Steps")
     st.markdown(
         """
@@ -1088,12 +1123,10 @@ def about_page():
         """
     )
     
-    st.markdown("---")
-
     # -------------------------------------------------
-    # 💡 Approach
+    #  Approach
     # -------------------------------------------------
-    st.markdown('<h2 style="font-size: 1.75rem;">💡 Approach</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="font-size: 1.75rem;"> Approach</h2>', unsafe_allow_html=True)
     st.markdown(
         """
         The approach is to evaluate each feature individually—based solely on information available to a customer—and estimate the **probability** that a restaurant receives an A based on that single feature. These probabilities are then combined using **logistic regression** to produce a final prediction.
@@ -1103,8 +1136,6 @@ def about_page():
         * Each feature is tested independently with its own held-out test set.
         * The model output for each feature is simply the **predicted probability of an A.**
         
-        
-
         Two important considerations arise:
         
         1.  Features fall into different categories: **Textual** (name, street address), **Independent categorical** (borough, cuisine), and **Ordered/related numeric** (ZIP code).
@@ -1112,12 +1143,10 @@ def about_page():
         """
     )
     
-    st.markdown("---")
-
     # -------------------------------------------------
-    # 📊 Feature Analyses
+    #  Feature Analyses
     # -------------------------------------------------
-    st.markdown('<h2 style="font-size: 1.75rem;">📊 Feature Analyses</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="font-size: 1.75rem;"> Feature Analyses</h2>', unsafe_allow_html=True)
 
     st.subheader("Borough")
     st.markdown(
@@ -1186,12 +1215,10 @@ def about_page():
         """
     )
     
-    st.markdown("---")
-
     # -------------------------------------------------
-    # 📈 Combining Features
+    #  Combining Features
     # -------------------------------------------------
-    st.markdown('<h2 style="font-size: 1.75rem;">📈 Combining Features</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 style="font-size: 1.75rem;"> Combining Features</h2>', unsafe_allow_html=True)
     st.markdown(
         """
         To improve prediction, the strongest independent features are combined using **logistic regression**:
@@ -1200,6 +1227,11 @@ def about_page():
         * Training uses gradient descent with a decreasing learning rate until convergence.
         """
     )
+
+    # Use a standard Streamlit column layout for the final results, 
+    # breaking the CSS column flow for the final presentation.
+    st.markdown('</div>', unsafe_allow_html=True) # CLOSE newspaper-body DIV
+    st.markdown("---") # Visual separator
 
     col_res, col_why = st.columns(2)
     
