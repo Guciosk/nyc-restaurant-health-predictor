@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 from datetime import datetime
+import matplotlib.pyplot as plt
+
 
 from src.data_loader import get_data, get_raw_data, refresh_data, load_training_data, clear_data_cache
 from src.predictor import predict_restaurant_grade, clear_model_cache, get_model_metadata, model_needs_retraining, ModelNeedsRetrainingError
@@ -279,10 +281,7 @@ st.markdown('<div class="header-separator"></div>', unsafe_allow_html=True)
 
 # --- Content Rendering Logic ---
 
-"""
-    Renders the custom input form and uses the model to predict the grade 
-    for a hypothetical, user-defined restaurant instance.
-    """
+
 def prediction_page():
 
     st.title(" Predict Next Inspection Grade")
@@ -842,6 +841,65 @@ def filter_page():
                         '</div>'
                     )
                     st.markdown(history_html, unsafe_allow_html=True)
+                    
+                    GRADE_COLORS = {
+                        'A': '#7DB87D',  # Green
+                        'B': '#E8C84A',  # Yellow
+                        'C': '#8B3A3A',  # Dark Orange/Red
+                        'P': '#9BA8C4',  # Pending (Grey/Blue)
+                        'N/A': '#D4956A' # Tan
+                    }
+
+                    # Define the desired order of grades for the pie chart
+                    GRADE_ORDER = ['A', 'B', 'C', 'P', 'N/A']
+                    
+                    if len(df_filtered) > 0:
+                        # Count grades, filling NaN with 'N/A'
+                        grade_counts = df_filtered['grade'].fillna('N/A').value_counts()
+                        
+                        # 1. Reindex the series to enforce the desired order
+                        grade_counts = grade_counts.reindex(GRADE_ORDER, fill_value=0)
+                        # Remove grades that are not present in the data (count is 0)
+                        grade_counts = grade_counts[grade_counts > 0]
+
+                        # 2. Map colors to the grades present in the counts
+                        labels = grade_counts.index.tolist()
+                        sizes = grade_counts.values
+                        colors = [GRADE_COLORS.get(grade, GRADE_COLORS['N/A']) for grade in labels]
+
+                        # PIE CHART setup (Increased figure size for better legend placement)
+                        fig1, ax1 = plt.subplots(figsize=(4, 4)) 
+
+                        # 3. Draw the pie chart with colors and autopct, but no labels on slices
+                        wedges, texts, autotexts = ax1.pie(
+                            sizes,
+                            autopct='%1.1f%%',
+                            startangle=90,
+                            colors=colors,
+                            textprops={'fontsize': 10, 'color': 'black'} 
+                        )
+                        
+                        # 4. Create the legend next to the pie chart
+                        ax1.legend(
+                            wedges, 
+                            labels,
+                            title="Grade",
+                            loc="center left", 
+                            bbox_to_anchor=(1.0, 0, 0.5, 1), # Positions the legend outside to the right
+                            fontsize=10
+                        )
+
+                        ax1.axis('equal') # Ensures the pie chart is a circle
+                        ax1.set_title("Grade Distribution", fontsize=12) 
+
+                        # 5. Render the figure in Streamlit
+                        st.pyplot(fig1)
+                        plt.close(fig1)
+                            
+
+                    else:
+                        st.info("No data available to display grade distribution charts.")
+                                        
 
 
 def blog_page():
@@ -854,7 +912,214 @@ def blog_page():
     if st.button("← Back to Home"):
         navigate_to('home')
 
+def about_page():
+    
+    st.title("CleanKitchen NYC Project Analysis")
+    
+    # -------------------------------------------------
+    # 🎯 Project Goal
+    # -------------------------------------------------
+    st.markdown('<h2 style="font-size: 1.75rem;">🎯 Project Goal</h2>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        Each year, the **New York City Health Department** inspects roughly 24,000 restaurants and evaluates them on food handling, temperature control, hygiene, and vermin management. To help the public understand inspection results, the city introduced a letter-grade system in 2010, assigning each restaurant an **A, B, or C**, with **A** being the highest score. Restaurants must display this grade at their entrance so customers can easily gauge their health standards. 
+        """
+    )
 
+    # Image placement using the requested dimensions
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin: 20px 0;">
+            <img src="https://picsum.photos/id/1/600/300">
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        Because restaurants in NYC often change ownership or reopen, many display **“Grade Pending”** or **“Not Yet Graded.”** In these cases, customers can only rely on basic information—such as the restaurant’s name, cuisine, address, borough, and ZIP code—to guess what grade it might eventually receive.
+        
+        The goal of this project is to use **only these publicly visible attributes** to predict whether a restaurant will earn an A or a lower grade.
+        """
+    )
+
+    st.markdown("---")
+
+    # -------------------------------------------------
+    # 💾 Data
+    # -------------------------------------------------
+    st.markdown('<h2 style="font-size: 1.75rem;">💾 Data</h2>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        NYC publishes all restaurant inspection results through its public database on **NYC Open Data**. These downloadable text files include:
+        
+        * Restaurant name, address, borough, ZIP code
+        * Cuisine type
+        * Inspection dates
+        * Violations observed
+        * Inspection score and assigned grade
+        * Any enforcement actions
+        
+        Because this project aims to mimic what a typical customer would know, **only public-facing attributes are used as model inputs.**
+        """
+    )
+    
+    st.subheader("Data Preparation Steps")
+    st.markdown(
+        """
+        To prepare the dataset:
+        
+        * The text files were converted into a spreadsheet format for analysis in MATLAB.
+        * Inspections without a final grade were removed.
+        * Restaurants labeled “Grade Pending” or “Not Yet Graded” were excluded.
+        * Because many restaurants undergo multiple inspections, grades were averaged to create a single "typical" score per restaurant.
+        * The dataset was split: **75% training data, 25% test data.**
+        
+        After cleaning, **2,768 unique graded restaurants remained**. About 52.6% received an A, while the rest earned lower grades.
+        """
+    )
+    
+    st.markdown("---")
+
+    # -------------------------------------------------
+    # 💡 Approach
+    # -------------------------------------------------
+    st.markdown('<h2 style="font-size: 1.75rem;">💡 Approach</h2>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        The approach is to evaluate each feature individually—based solely on information available to a customer—and estimate the **probability** that a restaurant receives an A based on that single feature. These probabilities are then combined using **logistic regression** to produce a final prediction.
+        
+        To support effective feature selection:
+        
+        * Each feature is tested independently with its own held-out test set.
+        * The model output for each feature is simply the **predicted probability of an A.**
+        
+        
+
+        Two important considerations arise:
+        
+        1.  Features fall into different categories: **Textual** (name, street address), **Independent categorical** (borough, cuisine), and **Ordered/related numeric** (ZIP code).
+        2.  Some features are strongly correlated—e.g., ZIP code ↔ borough, or name ↔ cuisine—which limits which features can be combined without harming performance. **Models avoid using pairs of features that are clearly correlated.**
+        """
+    )
+    
+    st.markdown("---")
+
+    # -------------------------------------------------
+    # 📊 Feature Analyses
+    # -------------------------------------------------
+    st.markdown('<h2 style="font-size: 1.75rem;">📊 Feature Analyses</h2>', unsafe_allow_html=True)
+
+    st.subheader("Borough")
+    st.markdown(
+        """
+        Using **Bayes’ Rule** with indicator functions and evaluating with a Naïve Bayes classifier:
+        
+        * Staten Island alone achieves **74.2% accuracy**.
+        * Citywide accuracy is **51.3%**, effectively random.
+        
+        This suggests borough is too coarse—boroughs are large and diverse. Staten Island performs better mainly because it has a more homogeneous population.
+        """
+    )
+    
+    st.subheader("Food Type")
+    st.markdown(
+        """
+        Using Naïve Bayes on cuisine type yields **61.4% accuracy**, significantly better than borough.
+        
+        * **Strong predictors** (generalization error < 30%): Asian (Chinese/Japanese), Donuts, Greek, Ice Cream, Indian, Indonesian, Juice/Smoothie, Russian, Sandwiches, Steak, Turkish.
+        * **Weak predictors** (error > 45%): African, Bagels, Bakery, Italian, Korean, Kosher, Middle Eastern, Pizza, Spanish, Vegetarian.
+        
+        Food type is therefore a valuable feature.
+        """
+    )
+
+    st.subheader("Name")
+    st.markdown(
+        """
+        Restaurant names were evaluated using a **Naïve Bayes text classifier** similar to standard spam filters.
+        
+        * Accuracy: **58.3%**, statistically significant.
+        * Training set produced 2,948 unique words.
+        * Words strongly associated with grade predictions include: **Bombay, Chen, Dunkin, Donuts, Fusion, Ice, Pain, Quotidien, Shoppe, Town.**
+        
+        Many of these correlate with cuisine type (e.g., “Donuts,” “Bombay,” “Ice”). Because of this overlap, **name and cuisine should not be combined** in the final model.
+        """
+    )
+
+    st.subheader("Street Address")
+    st.markdown(
+        """
+        Using text classification on street names:
+        
+        * 656 unique street terms.
+        * Accuracy: **52.5%**.
+        
+        Although certain streets (e.g., Richmond, Flatlands, Pearl, Knickerbocker) correlate with specific grades, overall performance is weak. **Street name is not a reliable feature.**
+        """
+    )
+    
+    st.subheader("ZIP Code")
+    st.markdown(
+        """
+        ZIP code is more structured because nearby ZIP codes share geographic boundaries. Three approaches were tested:
+        
+        1.  **Naïve Bayes:** Accuracy: 55.7% across 188 ZIP codes. Statistically meaningful but weaker than name or food type.
+        2.  **k-means Clustering:** ZIP codes grouped into 42 clusters (matching NYC’s 42 recognized neighborhoods). Accuracy: 53%, slightly worse than Naïve Bayes.
+        3.  **Polynomial Fitting:**
+            * Group ZIP codes into seven natural numeric clusters (e.g., 103xx → Staten Island).
+            * Encode A = 1, else = 0.
+            * Use cross-validation to find optimal polynomial degree.
+            * Fit a polynomial to each group to estimate probabilities.
+            * Accuracy: 53.1%, slightly above random.
+            
+        While polynomial fitting captures adjacency patterns, it performs worse than Naïve Bayes when used alone.
+        """
+    )
+    
+    st.markdown("---")
+
+    # -------------------------------------------------
+    # 📈 Combining Features
+    # -------------------------------------------------
+    st.markdown('<h2 style="font-size: 1.75rem;">📈 Combining Features</h2>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        To improve prediction, the strongest independent features are combined using **logistic regression**:
+        
+        * **Inputs:** Probability based on **food type** and Naïve Bayes probability from **ZIP code**.
+        * Training uses gradient descent with a decreasing learning rate until convergence.
+        """
+    )
+
+    col_res, col_why = st.columns(2)
+    
+    with col_res:
+        st.subheader("Final Results")
+        st.markdown(
+            """
+            * Logistic regression with food type + Naïve Bayes ZIP $\approx$ similar accuracy to food type alone.
+            * Logistic regression with food type + **polynomial ZIP code** improves accuracy to **62.4%**.
+            """
+        )
+
+    with col_why:
+        st.subheader("Key Insight")
+        st.markdown(
+            """
+            **Why polynomial ZIP works better in combination:**
+            
+            The polynomial estimate may be **biased**, but logistic regression corrects this during training through its learned coefficients. This improvement is consistent across multiple train/test splits, showing that the combination of Food Type's strong inherent prediction with the structurally corrected prediction from Polynomial ZIP yields the best final result.
+            """
+        )
+    
+    st.markdown("---")
+    
+    # Placeholder for navigation or next step
+    if st.button("Back to Home"):
+        # Assuming you have a navigation function like navigate_to('home')
+        pass
 # --- Page Router ---
 if st.session_state.page == 'home':
     home_page()
@@ -864,6 +1129,8 @@ elif st.session_state.page == 'filter':
     filter_page()
 elif st.session_state.page == 'blog':
     blog_page()
+elif st.session_state.page == 'about':
+    about_page()    
 else:
     # Handles clicks on About, Portfolio, Blog with a simple placeholder
     if st.button("← Go Home"):
