@@ -44,7 +44,7 @@ st.markdown("""
 
     /* Remove top padding to align navbar better */
     .block-container {
-        padding-top: 2rem;
+        padding-top: 3rem;
         padding-left: 3rem;
         padding-right: 3rem;
     }
@@ -58,6 +58,7 @@ st.markdown("""
         text-decoration: none;
         border: none;
         text-border: none !important;
+        oncursor: pointer;
     }
 
     .nav-container {
@@ -94,15 +95,31 @@ st.markdown("""
         font-size: 20px !important;
     }
     
+    
     .stButton > button:hover {
         background-color: #f0f0f0 !important;
         border-color: #000 !important;
     }
+    
+    .title-button > button {
+        background-color: #007BFF; /* Your desired color */
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 24px;
+        font-weight: bold;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 8px;
+}
 
     /* 4. HEADER DIVIDER (The horizontal line) */
     .header-separator {
         border-bottom: 1px solid #E0E0E0;
-        margin-top: 15px;
+        margin-top: 10px;
         margin-bottom: 40px;
     }
 
@@ -170,8 +187,7 @@ col1, col2, col3 = st.columns([2, 5, 1])
 with col1:
     # Use a dummy button styled as text for the brand/home link
     st.markdown('<div class="brand">CleanKitchen NYC</div>', unsafe_allow_html=True)
-    if st.button("CleanKitchen NYC", key="brand_home"):
-        navigate_to('home')
+
 
 with col2:
     # Using columns for better alignment and styling control with st.button
@@ -239,7 +255,7 @@ def home_page():
     render_image(c4, "IMG4<br>Placeholder")
 def filter_page():
     
-    
+    initial_sidebar_state="expanded"
 
     if df.empty:
         st.error("No data loaded. Please check your CSV files in the data/ folder.")
@@ -249,7 +265,7 @@ def filter_page():
     # -------------------------------------------------
     # SIDEBAR FILTERS
     # -------------------------------------------------
-    st.sidebar.header("🔎 Filter Restaurants")
+    st.sidebar.header(" Filter Restaurants")
 
     # Borough filter
     boroughs = ["All"] + sorted(df["borough"].dropna().unique().tolist())
@@ -290,101 +306,7 @@ def filter_page():
     </div>
     """, unsafe_allow_html=True)
 
-
-    # -------------------------------------------------
-    # Data Management (sidebar)
-    # -------------------------------------------------
-    st.sidebar.divider()
-    st.sidebar.caption("Data Management")
-    if st.sidebar.button("🔄 Fetch Fresh Data"):
-        with st.spinner("Fetching latest data from NYC Open Data API... This may take 1-2 minutes."):
-            success, message, count = refresh_data()
-            if success:
-                st.sidebar.success(f"{message} ({count:,} records)")
-                st.cache_data.clear()
-                st.rerun()
-            else:
-                st.sidebar.error(message)
-
-
-    # -------------------------------------------------
-    # Model Management (sidebar)
-    # -------------------------------------------------
-    st.sidebar.divider()
-    st.sidebar.caption("Model Management")
-
-    # Show current model info
-    try:
-        metadata = get_model_metadata()
-        training_date = metadata.get("training_date", "Unknown")
-        if training_date != "Unknown":
-            # Parse ISO format date
-            try:
-                dt = datetime.fromisoformat(training_date)
-                training_date = dt.strftime("%Y-%m-%d %H:%M")
-            except:
-                pass
-        metrics = metadata.get("training_metrics", {})
-        accuracy = metrics.get("accuracy")
-        if accuracy:
-            st.sidebar.markdown(f"**Last trained:** {training_date}")
-            st.sidebar.markdown(f"**Accuracy:** {accuracy:.1%}")
-        else:
-            st.sidebar.markdown("**Model:** Not yet trained with new features")
-    except Exception:
-        st.sidebar.markdown("**Model:** Ready for training")
-
-    # Training button
-    if st.sidebar.button("🧠 Retrain Model"):
-        with st.sidebar:
-            progress_bar = st.progress(0, text="Loading training data...")
-
-            try:
-                # Step 1: Load raw data
-                progress_bar.progress(10, text="Loading raw inspection data...")
-                raw_df = load_training_data()
-
-                # Step 2: Compute features (using training-specific function for correct temporal alignment)
-                progress_bar.progress(30, text="Computing training features...")
-                feature_df = compute_all_features(raw_df)
-
-                # Step 3: Train model
-                progress_bar.progress(50, text="Training model...")
-                model, metrics, feature_importances, encoders = train_model(feature_df)
-
-                # Step 4: Save model
-                progress_bar.progress(80, text="Saving model...")
-                save_model(model, encoders, metrics, feature_importances)
-
-                # Step 5: Clear caches
-                progress_bar.progress(90, text="Clearing caches...")
-                clear_model_cache()
-                clear_data_cache()
-
-                progress_bar.progress(100, text="Complete!")
-
-                # Show results
-                st.success("Model trained successfully!")
-                st.markdown(f"""
-                **Training Results:**
-                - Accuracy: {metrics['accuracy']:.1%}
-                - Precision: {metrics['precision']:.1%}
-                - Recall: {metrics['recall']:.1%}
-                - F1 Score: {metrics['f1']:.1%}
-                - Training samples: {metrics['train_samples']:,}
-                """)
-
-                # Show top feature importances
-                st.markdown("**Top Features:**")
-                top_features = get_feature_importance_ranking(feature_importances)[:5]
-                for name, importance in top_features:
-                    st.markdown(f"- {name}: {importance:.3f}")
-
-            except Exception as e:
-                st.error(f"Training failed: {e}")
-
-    st.sidebar.caption("Training takes ~30 seconds")
-
+    
 
     # -------------------------------------------------
     # MAIN LAYOUT: Map (left) + Details/Prediction (right)
@@ -623,115 +545,6 @@ def filter_page():
                         '</div>'
                     )
                     st.markdown(history_html, unsafe_allow_html=True)
-
-            # Check if model needs retraining
-            if model_needs_retraining():
-                st.warning(
-                    "**Model needs to be trained.** The prediction model has been updated with new features. "
-                    "Please click **'Retrain Model'** in the sidebar to train the model before making predictions."
-                )
-
-            if st.button("Predict Next Inspection", width='stretch'):
-                with st.spinner("Analyzing restaurant data..."):
-                    try:
-                        # Build model input
-                        model_input = row_to_model_input(selected_row)
-                        result = predict_restaurant_grade(model_input)
-
-                        predicted_grade = result["grade"]
-                        probabilities = result["probabilities"]
-                        formatted_probs = format_probabilities(probabilities)
-
-                        # Get current inspection info
-                        current_score = selected_row.get('score')
-                        current_grade = selected_row.get('grade')
-
-                        # Derive grade from score if official grade not available
-                        if pd.isna(current_grade) or current_grade not in ['A', 'B', 'C']:
-                            if pd.notna(current_score):
-                                if current_score <= 13:
-                                    derived_grade = 'A'
-                                elif current_score <= 27:
-                                    derived_grade = 'B'
-                                else:
-                                    derived_grade = 'C'
-                                grade_status = f"{derived_grade} (pending)"
-                            else:
-                                derived_grade = None
-                                grade_status = "Pending"
-                        else:
-                            derived_grade = current_grade
-                            grade_status = current_grade
-
-                        # Calculate expected time to next inspection
-                        days_since = selected_row.get('days_since_last_inspection', 0)
-                        if pd.isna(days_since):
-                            days_since = 0
-
-                        median_interval = 124  # median days between inspections
-
-                        # Handle stale data (no inspection in over a year)
-                        if days_since > 365:
-                            years_ago = round(days_since / 365, 1)
-                            time_estimate = f"Last inspected {years_ago:.0f}+ years ago"
-                        elif days_since > median_interval:
-                            time_estimate = "Overdue for inspection"
-                        elif days_since > median_interval - 30:
-                            time_estimate = "Due within ~1 month"
-                        elif days_since > median_interval - 60:
-                            time_estimate = "Expected in ~2 months"
-                        elif days_since > median_interval - 90:
-                            time_estimate = "Expected in ~3 months"
-                        else:
-                            months = round((median_interval - days_since) / 30)
-                            time_estimate = f"Expected in ~{months} months"
-
-                        # Next inspection prediction card
-                        pred_color = get_grade_color(predicted_grade)
-                        st.markdown(f"""
-                        <div class="info-card" style="text-align: center; border: 2px solid {pred_color};">
-                            <p style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #6C757D; text-transform: uppercase;">
-                                Predicted Next Inspection
-                            </p>
-                            <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">
-                                {time_estimate}
-                            </p>
-                            <div class="grade-badge grade-{predicted_grade}" style="margin: 0 auto;">
-                                {predicted_grade}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                        st.markdown("#### Confidence by Grade")
-                        for g, p in formatted_probs:
-                            grade_color = get_grade_color(g)
-                            st.markdown(f"""
-                            <div style="margin-bottom: 8px;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                                    <span>Grade {g}</span>
-                                    <span style="font-weight: 500;">{p:.1f}%</span>
-                                </div>
-                                <div style="background: #E9ECEF; border-radius: 4px; height: 6px; overflow: hidden;">
-                                    <div style="background: {grade_color}; width: {p}%; height: 100%; border-radius: 4px;"></div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                        # Historical context
-                        if derived_grade == 'C' or (pd.notna(current_score) and current_score >= 28):
-                            st.markdown("""
-                            <div style="background: #F8F9FA; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; color: #6C757D;">
-                                <strong>Historical Pattern:</strong> 64% of restaurants that fail an inspection
-                                pass their re-inspection within ~4 months after addressing violations.
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                    except ModelNeedsRetrainingError:
-                        st.error(
-                            "**Model needs retraining.** Please click 'Retrain Model' in the sidebar first."
-                        )
-                    except Exception as e:
-                        st.error(f"Error making prediction: {e}")
 
 
 def blog_page():
