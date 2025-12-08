@@ -217,6 +217,57 @@ st.markdown("""
         transparent
     );
 }
+/*--------------- Team Member Card Styles ---------------*/
+.team-member-container {
+        display: flex;
+        align-items: center; /* Vertically center image and text block */
+        gap: 30px;
+        max-width: 750px;
+        margin: 30px auto; /* Center the member block */
+    }
+    .profile-img {
+        width: 200px; 
+        height: 200px;
+        border-radius: 50%; /* Makes the image circular */
+        object-fit: cover;
+        flex-shrink: 0; /* Prevents the image from shrinking */
+        border: 5px solid #E0E0E0; /* Light grey border */
+    }
+    .member-details {
+        flex-grow: 1;
+        text-align: left;
+    }
+    .member-details strong {
+        font-size: 2.5rem;
+        font-weight: 800;
+        display: block;
+        margin-bottom: 5px;
+    }
+    .member-details ul {
+        list-style: none; /* Remove default bullet points */
+        padding: 0;
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+    .linkedin-icon {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        margin-right: 5px;
+        vertical-align: middle;
+    }
+    .github-icon {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        margin-right: 5px;
+        vertical-align: middle;
+    .divider {
+        border-bottom: 1px solid #DDDDDD; /* Light grey line */
+        margin: 40px auto;
+        width: 80%;
+    }
     
     </style>
 """, unsafe_allow_html=True)
@@ -900,17 +951,74 @@ def filter_page():
                     else:
                         st.info("No data available to display grade distribution charts.")
                                         
+def render_member_card(name, college, major, linkedin_url, image_url, github_url):
+    """Generates the HTML/Markdown for a single team member card."""
+    
+    # Placeholder image for the LinkedIn icon
+    linkedin_icon_url = "https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png"
+    linkedin_icon_html = f'<img class="linkedin-icon" src="{linkedin_icon_url}" alt="LinkedIn Icon">'
+    github_icon_url = "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"   
+    github_icon_html = f'<img class="github-icon" src="{github_icon_url}" alt="GitHub Icon">'
 
+    html = f"""
+    <div class="team-member-container">
+        <div>
+            <img class="profile-img" src="{image_url}" alt="{name}'s Photo">
+        </div>
+        <div class="member-details">
+            <strong>{name}</strong>
+            <ul>
+                <li>College: {college}</li>
+                <li>Major: {major}</li>
+                <li>LinkedIn: {linkedin_icon_html} <a href="{linkedin_url}" target="_blank">{name}</a></li>
+                <li>GitHub: {github_icon_html} <a href="{github_url}" target="_blank">{name}</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="divider"></div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 def blog_page():
-    """Renders the content for the Blog Page."""
-    st.title("💡 Blog Page")
-    st.write("Welcome to the blog page! Here you can read the latest blog posts.")
+    st.markdown("<h1 style='text-align: center; font-size: 75px;'>Creators</h1>", unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("### Placeholder for your Blog Page")
-    st.info("You would add your blog posts here.")
-    if st.button("← Back to Home"):
-        navigate_to('home')
+    # --- MEMBER 1: MANUALLY EDIT THIS BLOCK ---
+    render_member_card(
+        name="Jack Kaplan",
+        college="CUNY College",
+        major="Computer Science",
+        linkedin_url="https://www.linkedin.com/in/jackkaplan1",
+        github_url="https://github.com/Jack-Kaplan",
+        image_url="https://ca.slack-edge.com/T094PKG3ASD-U095B5FJP1P-d40df1de134c-512" 
+        
+    )
+    st.markdown("---")
+
+    # --- MEMBER 2: MANUALLY EDIT THIS BLOCK ---
+    render_member_card(
+        name="Dominik Kasza",
+        college="Queens College",
+        major="[TEAMMATE MAJOR/FIELD OF STUDY]",
+        linkedin_url="https://www.linkedin.com/in/dominik-kasza-",
+        github_url="https://github.com/Guciosk",
+        image_url="https://ca.slack-edge.com/T094PKG3ASD-U09628KG754-788280e58034-512" 
+    )
+    st.markdown("---")
+
+    # --- MEMBER 3: MANUALLY EDIT THIS BLOCK ---
+    render_member_card(
+        name="Mauricio",
+        college="CUNY College",
+        major="Computer Science",
+        linkedin_url="",
+        github_url="https://github.com/M4URIC18",
+        image_url="https://ca.slack-edge.com/T094PKG3ASD-U096M8URFAR-dfe4d20b491f-512"
+    )
+    
+    st.markdown("---")
+
+    if st.button("End of Team Page"):
+        st.info("You've reached the end of the manual input section.")
 
 def about_page():
     
