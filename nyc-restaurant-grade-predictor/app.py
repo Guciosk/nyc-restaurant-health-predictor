@@ -1,13 +1,7 @@
 import streamlit as st
-#import js2py as js
-import streamlit as st
 import pandas as pd
 import pydeck as pdk
 from datetime import datetime
-from dotenv import load_dotenv
-import os
-from urllib.request import urlopen, Request
-import requests
 
 from src.data_loader import get_data, get_raw_data, refresh_data, load_training_data, clear_data_cache
 from src.predictor import predict_restaurant_grade, clear_model_cache, get_model_metadata, model_needs_retraining, ModelNeedsRetrainingError
@@ -21,7 +15,6 @@ from src.utils import (
     display_value,
     prepare_map_dataframe,
 )
-APP_TOKEN = st.secrets["NYC_OPENDATA_APP_TOKEN"]
 
 
 # --- Initialize Session State for Page Navigation ---

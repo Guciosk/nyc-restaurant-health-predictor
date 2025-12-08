@@ -6,7 +6,6 @@ This module handles:
 - Cleaning and transforming the data
 - Caching to avoid repeated API calls
 """
-import streamlit as st
 import pandas as pd
 import numpy as np
 import os
