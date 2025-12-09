@@ -54,7 +54,7 @@ st.markdown("""
     /* 2. NAVBAR STYLING */
     .brand {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-size: 50px;
+        font-size: 45px;
         font-weight: 800;
         color: #000;
         text-decoration: none;
@@ -79,7 +79,7 @@ st.markdown("""
         text-transform: uppercase;
         color: #333;
         text-decoration: none;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
         cursor: pointer;
         border: none;
         text-border: none !important;
@@ -92,7 +92,7 @@ st.markdown("""
         color: black !important;
         border: 1px solid #000 !important;
         border-radius: 30px !important; /* This creates the rounded 'pill' border */
-        padding: 5px 25px !important;
+        padding: 10px 25px !important;
         font-weight: 700 !important;
         transition: all 0.3s ease;
         font-size: 20px !important;
@@ -122,8 +122,8 @@ st.markdown("""
     /* 4. HEADER DIVIDER (The horizontal line) */
     .header-separator {
         border-bottom: 1px solid #E0E0E0;
-        margin-top: 10px;
-        margin-bottom: 40px;
+        margin-top: 3px;
+        margin-bottom: 20px;
     }
 
     /* Hero Text */
@@ -221,10 +221,10 @@ st.markdown("""
 /*--------------- Team Member Card Styles ---------------*/
 .team-member-container {
         display: flex;
-        align-items: center; /* Vertically center image and text block */
+        align-items: center-right; /* Vertically center image and text block */
         gap: 30px;
         max-width: 750px;
-        margin: 30px auto; /* Center the member block */
+        margin: 20px auto; /* Center the member block */
     }
     .profile-img {
         width: 200px; 
@@ -333,21 +333,20 @@ col1, col2, col3 = st.columns([2, 5, 1])
 with col1:
     # Use a dummy button styled as text for the brand/home link
     st.markdown('<div class="brand">CleanKitchen NYC</div>', unsafe_allow_html=True)
-    if st.button("", key="nav_brand"):
-        navigate_to('home')  # Navigates to home page
+    
 
 with col2:
     # Using columns for better alignment and styling control with st.button
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([1, 1, 1, 2])
 
     # The actual links are now buttons styled to look like text
-    with nav_col1:
+    with nav_col2:
         if st.button("About", key="nav_about"):
             navigate_to('about') # Navigates to a dummy 'about' page
-    with nav_col2:
+    with nav_col3:
         if st.button("Filter/Predictor", key="nav_filter"):
             navigate_to('filter') # Navigates to a dummy 'portfolio' page
-    with nav_col3:
+    with nav_col4:
         if st.button("Blog", key="nav_blog"):
             navigate_to('blog') # Navigates to a dummy 'blog' page
 
@@ -939,7 +938,7 @@ def blog_page():
     render_member_card(
         name="Dominik Kasza",
         college="Queens College",
-        major="[TEAMMATE MAJOR/FIELD OF STUDY]",
+        major="Computer Science",
         linkedin_url="https://www.linkedin.com/in/dominik-kasza-",
         github_url="https://github.com/Guciosk",
         image_url="https://ca.slack-edge.com/T094PKG3ASD-U09628KG754-788280e58034-512" 
