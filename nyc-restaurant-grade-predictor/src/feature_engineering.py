@@ -48,9 +48,13 @@ def compute_inspection_frequency(df: pd.DataFrame) -> pd.Series:
 
 def compute_grade_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute previous grades (lag-1 and lag-2) for each restaurant.
+    Compute previous grades (lag-1 and lag-2) for each restaurant (for INFERENCE).
 
-    For the LATEST inspection, prev_grade_1 is the grade from the inspection before it.
+    For predicting the NEXT inspection:
+    - prev_grade_1 = grade from the LATEST inspection (rank 1)
+    - prev_grade_2 = grade from the inspection before that (rank 2)
+
+    This ensures the model sees the most recent grade when predicting.
 
     Args:
         df: DataFrame with 'camis', 'inspection_date', 'grade' columns
@@ -68,13 +72,12 @@ def compute_grade_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     # Rank inspections by date (most recent = 1)
     graded['inspection_rank'] = graded.groupby('camis').cumcount() + 1
 
-    # For the most recent inspection (rank 1), get the previous grades
-    # prev_grade_1 = grade from rank 2 (the inspection before the latest)
-    # prev_grade_2 = grade from rank 3
-    prev_1 = graded[graded['inspection_rank'] == 2][['camis', 'grade']].rename(
+    # Get latest grade as prev_grade_1 (rank 1 = most recent)
+    prev_1 = graded[graded['inspection_rank'] == 1][['camis', 'grade']].rename(
         columns={'grade': 'prev_grade_1'}
     )
-    prev_2 = graded[graded['inspection_rank'] == 3][['camis', 'grade']].rename(
+    # Get second-latest grade as prev_grade_2 (rank 2)
+    prev_2 = graded[graded['inspection_rank'] == 2][['camis', 'grade']].rename(
         columns={'grade': 'prev_grade_2'}
     )
 
@@ -94,10 +97,13 @@ def compute_grade_lag_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def compute_prev_scores(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute previous inspection scores for each restaurant.
+    Compute previous inspection scores for each restaurant (for INFERENCE).
 
-    prev_score_1 = score from the inspection before the latest
-    prev_score_2 = score from the inspection before that
+    For predicting the NEXT inspection:
+    - prev_score_1 = score from the LATEST inspection (rank 1)
+    - prev_score_2 = score from the inspection before that (rank 2)
+
+    This ensures the model sees the most recent score when predicting.
 
     Args:
         df: DataFrame with 'camis', 'inspection_date', 'score' columns
@@ -110,14 +116,15 @@ def compute_prev_scores(df: pd.DataFrame) -> pd.DataFrame:
     scored = scored.sort_values(['camis', 'inspection_date'], ascending=[True, False])
     scored = scored.drop_duplicates(subset=['camis', 'inspection_date'])
 
-    # Rank inspections
+    # Rank inspections (1 = most recent)
     scored['inspection_rank'] = scored.groupby('camis').cumcount() + 1
 
-    # Get scores from previous inspections (not the current one)
-    prev_1 = scored[scored['inspection_rank'] == 2][['camis', 'score']].rename(
+    # Get latest score as prev_score_1 (rank 1 = most recent)
+    prev_1 = scored[scored['inspection_rank'] == 1][['camis', 'score']].rename(
         columns={'score': 'prev_score_1'}
     )
-    prev_2 = scored[scored['inspection_rank'] == 3][['camis', 'score']].rename(
+    # Get second-latest score as prev_score_2 (rank 2)
+    prev_2 = scored[scored['inspection_rank'] == 2][['camis', 'score']].rename(
         columns={'score': 'prev_score_2'}
     )
 
@@ -426,7 +433,7 @@ def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
     latest = df_sorted.drop_duplicates(subset=['camis'], keep='first').copy()
 
     # Select base columns (borough already renamed from boro by data_loader)
-    base_cols = ['camis', 'dba', 'borough', 'zipcode', 'cuisine_description',
+    base_cols = ['camis', 'dba', 'borough', 'street', 'zipcode', 'cuisine_description',
                  'score', 'grade', 'critical_flag', 'inspection_date',
                  'latitude', 'longitude']
     base_cols = [c for c in base_cols if c in latest.columns]

@@ -21,8 +21,10 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "restaurant_grade_model.pkl")
 META_PATH = os.path.join(BASE_DIR, "models", "model_metadata.json")
 
 # Feature configuration
-# NOTE: We use PREVIOUS inspection data to predict CURRENT grade
-# This avoids data leakage (using current score to predict current grade)
+# NOTE: We use CURRENT inspection data to predict NEXT grade
+# - prev_score_1 = score from current inspection (used to predict next inspection)
+# - prev_score_2 = score from previous inspection
+# - target_grade = grade from the NEXT inspection (what we're predicting)
 FEATURE_COLUMNS = [
     'borough',
     'zipcode',
@@ -31,8 +33,8 @@ FEATURE_COLUMNS = [
     'inspection_frequency',
     'prev_grade_1',
     'prev_grade_2',
-    'prev_score_1',      # Score from previous inspection
-    'prev_score_2',      # Score from inspection before that
+    'prev_score_1',      # Score from current inspection
+    'prev_score_2',      # Score from previous inspection
     'critical_violations_12mo',
     'total_violations_all_time',
     'avg_score_historical',
