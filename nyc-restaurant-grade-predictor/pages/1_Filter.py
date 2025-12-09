@@ -104,6 +104,8 @@ elif st.session_state.prev_filters != current_filters:
     st.session_state.prev_filters = current_filters
     if 'selected_camis' in st.session_state:
         del st.session_state.selected_camis
+    if 'restaurant_selector' in st.session_state:
+        del st.session_state.restaurant_selector
 
 st.sidebar.markdown(f"""
 <div class="results-counter">
@@ -332,7 +334,7 @@ with right_col:
                 return f"{name} ({borough}, {zipcode})"
 
         camis_list = df_filtered['camis'].tolist()
-        labels_dict = {row['camis']: make_label(row) for _, row in df_filtered.iterrows()}
+        labels_dict = df_filtered.set_index('camis').apply(make_label, axis=1).to_dict()
 
         # Initialize selectbox state if not set or if current value not in filtered list
         current_selection = st.session_state.get('restaurant_selector')
