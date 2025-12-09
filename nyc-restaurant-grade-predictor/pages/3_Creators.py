@@ -55,9 +55,6 @@ def render_member_card(name, college, major, linkedin_url, github_url, image_url
 
 
 # --- Page Content ---
-st.markdown("<h1 style='text-align: center; font-size: 75px;'>Creators</h1>", unsafe_allow_html=True)
-render_header_divider()
-
 # --- Team Members ---
 render_member_card(
     name="Jack Kaplan",
