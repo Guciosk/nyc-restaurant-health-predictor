@@ -80,7 +80,7 @@ Install packages:
 pip install -r requirements.txt
 ```
 
-(Optional) Set NYC Open Data API token for faster data fetching:
+Set your NYC Open Data API token (required for data fetching):
 
 ```bash
 export NYC_OPENDATA_APP_TOKEN=your_token_here
