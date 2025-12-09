@@ -202,9 +202,6 @@ if st.sidebar.button("Retrain Model"):
 st.sidebar.caption("Training takes ~30 seconds")
 
 # --- MAIN LAYOUT ---
-st.title("Restaurant Filter & Predictor")
-render_header_divider()
-
 left_col, right_col = st.columns([2, 1])
 
 with left_col:
