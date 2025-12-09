@@ -96,6 +96,17 @@ if zip_choice != "All":
 if cuisine_choice:
     df_filtered = df_filtered[df_filtered["cuisine_description"].isin(cuisine_choice)]
 
+# Reset map selection when filters change
+current_filters = (borough_choice, zip_choice, tuple(cuisine_choice))
+if 'prev_filters' not in st.session_state:
+    st.session_state.prev_filters = current_filters
+elif st.session_state.prev_filters != current_filters:
+    st.session_state.prev_filters = current_filters
+    if 'selected_camis' in st.session_state:
+        del st.session_state.selected_camis
+    if 'restaurant_selector' in st.session_state:
+        del st.session_state.restaurant_selector
+
 st.sidebar.markdown(f"""
 <div class="results-counter">
     <p>{len(df_filtered):,} restaurants found</p>
@@ -216,6 +227,7 @@ with left_col:
 
         layer = pdk.Layer(
             "ScatterplotLayer",
+            id="restaurants",
             data=map_df,
             get_position=["longitude", "latitude"],
             get_color="color",
@@ -239,7 +251,7 @@ with left_col:
             "style": {"backgroundColor": "#FFFFFF", "color": "#2C3E50", "fontSize": "14px", "padding": "12px", "borderRadius": "6px", "boxShadow": "0 2px 8px rgba(0,0,0,0.15)"}
         }
 
-        st.pydeck_chart(
+        event = st.pydeck_chart(
             pdk.Deck(
                 layers=[layer],
                 initial_view_state=view_state,
@@ -247,7 +259,21 @@ with left_col:
                 map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
             ),
             height=500,
+            on_select="rerun",
+            selection_mode="single-object",
+            key="restaurant_map"
         )
+
+        # Handle map click selection
+        if event.selection and event.selection.get("objects", {}).get("restaurants"):
+            selected_objects = event.selection["objects"]["restaurants"]
+            if selected_objects:
+                clicked_camis = selected_objects[0].get("camis")
+                if clicked_camis and st.session_state.get('selected_camis') != clicked_camis:
+                    st.session_state.selected_camis = clicked_camis
+                    # Update the selectbox value directly (it uses CAMIS as its value)
+                    st.session_state.restaurant_selector = clicked_camis
+                    st.rerun()
 
         # Grade legend
         st.markdown("""
@@ -294,29 +320,39 @@ with right_col:
             name_col = df_filtered.columns[0]
 
         df_filtered = df_filtered.reset_index(drop=True)
-        options = df_filtered.index.tolist()
 
-        # Build labels with street name and ZIP for easy identification
-        def make_label(i):
-            name = df_filtered.loc[i, name_col]
-            street = df_filtered.loc[i, 'street'] if 'street' in df_filtered.columns else None
-            zipcode = df_filtered.loc[i, 'zipcode']
+        # Build labels dictionary keyed by CAMIS for stable identification
+        def make_label(row):
+            name = row[name_col]
+            street = row.get('street')
+            zipcode = row.get('zipcode')
+            borough = row.get('borough')
 
             if pd.notna(street) and street not in ('nan', ''):
                 return f"{name} ({street}, {zipcode})"
             else:
-                borough = df_filtered.loc[i, 'borough']
                 return f"{name} ({borough}, {zipcode})"
 
-        labels = [make_label(i) for i in options]
+        camis_list = df_filtered['camis'].tolist()
+        labels_dict = df_filtered.set_index('camis').apply(make_label, axis=1).to_dict()
 
-        selected_idx = st.selectbox(
+        # Initialize selectbox state if not set or if current value not in filtered list
+        current_selection = st.session_state.get('restaurant_selector')
+        if current_selection not in camis_list:
+            # Use selected_camis from map click if valid, otherwise first in list
+            if st.session_state.get('selected_camis') in camis_list:
+                st.session_state.restaurant_selector = st.session_state.selected_camis
+            elif camis_list:
+                st.session_state.restaurant_selector = camis_list[0]
+
+        selected_camis = st.selectbox(
             "Choose a restaurant to analyze:",
-            options=options,
-            format_func=lambda i: labels[i]
+            options=camis_list,
+            format_func=lambda c: labels_dict.get(c, str(c)),
+            key="restaurant_selector"
         )
 
-        selected_row = df_filtered.loc[selected_idx]
+        selected_row = df_filtered[df_filtered['camis'] == selected_camis].iloc[0]
 
         # Get values
         restaurant_name = selected_row.get(name_col, 'N/A')
