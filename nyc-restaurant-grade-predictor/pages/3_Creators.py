@@ -7,7 +7,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from src.components import load_css, render_header_divider
+from src.components import load_css, render_top_nav, render_header_divider
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -16,6 +16,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 load_css()
+
+# --- Top Navigation ---
+render_top_nav()
+render_header_divider()
 
 # --- Helper Function ---
 def render_member_card(name, college, major, linkedin_url, github_url, image_url):

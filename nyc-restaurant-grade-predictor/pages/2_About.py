@@ -1,13 +1,15 @@
 """
-About Page - Project documentation and methodology for CleanKitchen NYC.
+About Page - Model documentation with dynamically loaded statistics.
 """
 
 import streamlit as st
+import pandas as pd
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from src.components import load_css, render_header_divider
+from src.components import load_css, render_top_nav, render_header_divider
+from src.trainer import load_metadata
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -17,11 +19,16 @@ st.set_page_config(
 )
 load_css()
 
-# --- Page Content ---
-st.title("CleanKitchen NYC Project Analysis")
+# --- Load Model Metadata ---
+metadata = load_metadata()
+
+# --- Top Navigation ---
+render_top_nav()
 render_header_divider()
 
-# Wrap the content section in the newspaper body container
+# --- Page Content ---
+st.title("CleanKitchen NYC Project Analysis")
+
 st.markdown('<div class="newspaper-body">', unsafe_allow_html=True)
 
 # -------------------------------------------------
@@ -32,179 +39,248 @@ st.markdown('<h2 style="font-size: 1.75rem;">Project Goal</h2>', unsafe_allow_ht
 
 st.markdown(
     """
-    Each year, the **New York City Health Department** inspects roughly 24,000 restaurants and evaluates them on food handling, temperature control, hygiene, and vermin management. To help the public understand inspection results, the city introduced a letter-grade system in 2010, assigning each restaurant an **A, B, or C**, with **A** being the highest score. Restaurants must display this grade at their entrance so customers can easily gauge their health standards.
-    """
-)
+    Each year, the **New York City Health Department** inspects roughly 24,000 restaurants
+    and evaluates them on food handling, temperature control, hygiene, and vermin management.
+    The city assigns each restaurant a letter grade (**A, B, or C**), with **A** being the
+    best score. Restaurants must display this grade at their entrance.
 
-st.markdown(
-    """
-    Because restaurants in NYC often change ownership or reopen, many display **"Grade Pending"** or **"Not Yet Graded."** In these cases, customers can only rely on basic information--such as the restaurant's name, cuisine, address, borough, and ZIP code--to guess what grade it might eventually receive.
-
-    The goal of this project is to use **only these publicly visible attributes** to predict whether a restaurant will earn an A or a lower grade.
+    This project uses **machine learning** to predict a restaurant's next inspection grade
+    based on its historical inspection data, violation patterns, and contextual factors.
     """
 )
 
 # -------------------------------------------------
-#  Data
+#  Data Source
 # -------------------------------------------------
-st.markdown('<h2 style="font-size: 1.75rem;">Data</h2>', unsafe_allow_html=True)
+st.markdown('<h2 style="font-size: 1.75rem;">Data Source</h2>', unsafe_allow_html=True)
 st.markdown(
     """
-    NYC publishes all restaurant inspection results through its public database on **NYC Open Data**. These downloadable text files include:
+    NYC publishes all restaurant inspection results through **NYC Open Data**. The dataset includes:
 
-    * Restaurant name, address, borough, ZIP code
+    * Restaurant name, address, borough, and ZIP code
     * Cuisine type
-    * Inspection dates
-    * Violations observed
-    * Inspection score and assigned grade
-    * Any enforcement actions
+    * Inspection dates and scores
+    * Violation codes and severity (critical vs. non-critical)
+    * Assigned grades (A, B, C)
 
-    Because this project aims to mimic what a typical customer would know, **only public-facing attributes are used as model inputs.**
-    """
-)
-
-st.markdown('<div class="column-clear"></div>', unsafe_allow_html=True)
-st.subheader("Data Preparation Steps")
-st.markdown(
-    """
-    To prepare the dataset:
-
-    * The text files were converted into a spreadsheet format for analysis.
-    * Inspections without a final grade were removed.
-    * Restaurants labeled "Grade Pending" or "Not Yet Graded" were excluded.
-    * Because many restaurants undergo multiple inspections, grades were averaged to create a single "typical" score per restaurant.
-    * The dataset was split: **75% training data, 25% test data.**
-
-    After cleaning, **2,768 unique graded restaurants remained**. About 52.6% received an A, while the rest earned lower grades.
+    Data is fetched via the NYC Open Data API and cached locally for performance.
     """
 )
 
 # -------------------------------------------------
-#  Approach
+#  Model Approach
 # -------------------------------------------------
-st.markdown('<h2 style="font-size: 1.75rem;">Approach</h2>', unsafe_allow_html=True)
+st.markdown('<h2 style="font-size: 1.75rem;">Model Approach</h2>', unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown(
+        """
+        **Algorithm**: Random Forest Classifier
+
+        Random Forest is an ensemble method that builds multiple decision trees and combines
+        their predictions. It handles mixed feature types well and provides feature importance rankings.
+        """
+    )
+
+with col2:
+    st.markdown(
+        """
+        **Configuration**:
+        * 100 decision trees
+        * Balanced class weights (handles grade imbalance)
+        * 80/20 train/test split (stratified)
+        """
+    )
+
 st.markdown(
     """
-    The approach is to evaluate each feature individually--based solely on information available to a customer--and estimate the **probability** that a restaurant receives an A based on that single feature. These probabilities are then combined using **logistic regression** to produce a final prediction.
-
-    To support effective feature selection:
-
-    * Each feature is tested independently with its own held-out test set.
-    * The model output for each feature is simply the **predicted probability of an A.**
-
-    Two important considerations arise:
-
-    1.  Features fall into different categories: **Textual** (name, street address), **Independent categorical** (borough, cuisine), and **Ordered/related numeric** (ZIP code).
-    2.  Some features are strongly correlated--e.g., ZIP code to borough, or name to cuisine--which limits which features can be combined without harming performance. **Models avoid using pairs of features that are clearly correlated.**
-    """
-)
-
-# -------------------------------------------------
-#  Feature Analyses
-# -------------------------------------------------
-st.markdown('<h2 style="font-size: 1.75rem;">Feature Analyses</h2>', unsafe_allow_html=True)
-
-st.subheader("Borough")
-st.markdown(
-    """
-    Using **Bayes' Rule** with indicator functions and evaluating with a Naive Bayes classifier:
-
-    * Staten Island alone achieves **74.2% accuracy**.
-    * Citywide accuracy is **51.3%**, effectively random.
-
-    This suggests borough is too coarse--boroughs are large and diverse. Staten Island performs better mainly because it has a more homogeneous population.
-    """
-)
-
-st.subheader("Food Type")
-st.markdown(
-    """
-    Using Naive Bayes on cuisine type yields **61.4% accuracy**, significantly better than borough.
-
-    * **Strong predictors** (generalization error < 30%): Asian (Chinese/Japanese), Donuts, Greek, Ice Cream, Indian, Indonesian, Juice/Smoothie, Russian, Sandwiches, Steak, Turkish.
-    * **Weak predictors** (error > 45%): African, Bagels, Bakery, Italian, Korean, Kosher, Middle Eastern, Pizza, Spanish, Vegetarian.
-
-    Food type is therefore a valuable feature.
-    """
-)
-
-st.subheader("Name")
-st.markdown(
-    """
-    Restaurant names were evaluated using a **Naive Bayes text classifier** similar to standard spam filters.
-
-    * Accuracy: **58.3%**, statistically significant.
-    * Training set produced 2,948 unique words.
-    * Words strongly associated with grade predictions include: **Bombay, Chen, Dunkin, Donuts, Fusion, Ice, Pain, Quotidien, Shoppe, Town.**
-
-    Many of these correlate with cuisine type (e.g., "Donuts," "Bombay," "Ice"). Because of this overlap, **name and cuisine should not be combined** in the final model.
-    """
-)
-
-st.subheader("Street Address")
-st.markdown(
-    """
-    Using text classification on street names:
-
-    * 656 unique street terms.
-    * Accuracy: **52.5%**.
-
-    Although certain streets (e.g., Richmond, Flatlands, Pearl, Knickerbocker) correlate with specific grades, overall performance is weak. **Street name is not a reliable feature.**
-    """
-)
-
-st.subheader("ZIP Code")
-st.markdown(
-    """
-    ZIP code is more structured because nearby ZIP codes share geographic boundaries. Three approaches were tested:
-
-    1.  **Naive Bayes:** Accuracy: 55.7% across 188 ZIP codes. Statistically meaningful but weaker than name or food type.
-    2.  **k-means Clustering:** ZIP codes grouped into 42 clusters (matching NYC's 42 recognized neighborhoods). Accuracy: 53%, slightly worse than Naive Bayes.
-    3.  **Polynomial Fitting:**
-        * Group ZIP codes into seven natural numeric clusters (e.g., 103xx -> Staten Island).
-        * Encode A = 1, else = 0.
-        * Use cross-validation to find optimal polynomial degree.
-        * Fit a polynomial to each group to estimate probabilities.
-        * Accuracy: 53.1%, slightly above random.
-
-    While polynomial fitting captures adjacency patterns, it performs worse than Naive Bayes when used alone.
+    **Temporal Alignment**: The model is trained to predict a restaurant's *next* inspection grade
+    based on data available at the time of the *current* inspection. This prevents data leakage
+    and ensures realistic predictions.
     """
 )
 
 # -------------------------------------------------
-#  Combining Features
+#  Features
 # -------------------------------------------------
-st.markdown('<h2 style="font-size: 1.75rem;">Combining Features</h2>', unsafe_allow_html=True)
-st.markdown(
-    """
-    To improve prediction, the strongest independent features are combined using **logistic regression**:
+st.markdown('<h2 style="font-size: 1.75rem;">Features (17 Total)</h2>', unsafe_allow_html=True)
 
-    * **Inputs:** Probability based on **food type** and Naive Bayes probability from **ZIP code**.
-    * Training uses gradient descent with a decreasing learning rate until convergence.
-    """
+st.markdown("The model uses 17 engineered features across five categories:")
+
+feature_data = {
+    "Category": [
+        "Location", "Location",
+        "Restaurant",
+        "Inspection History", "Inspection History", "Inspection History",
+        "Inspection History", "Inspection History", "Inspection History",
+        "Violation History", "Violation History", "Violation History",
+        "Trends & Context", "Trends & Context", "Trends & Context",
+        "Trends & Context", "Trends & Context"
+    ],
+    "Feature": [
+        "borough", "zipcode",
+        "cuisine_description",
+        "prev_grade_1", "prev_grade_2", "prev_score_1",
+        "prev_score_2", "days_since_last_inspection", "inspection_frequency",
+        "critical_violations_12mo", "total_violations_all_time", "violation_diversity",
+        "avg_score_historical", "score_trend", "grade_stability",
+        "cuisine_avg_score", "zipcode_avg_score"
+    ],
+    "Description": [
+        "NYC borough (Manhattan, Brooklyn, Queens, Bronx, Staten Island)",
+        "5-digit ZIP code",
+        "Type of cuisine served",
+        "Grade from most recent previous inspection",
+        "Grade from two inspections ago",
+        "Score from most recent previous inspection",
+        "Score from two inspections ago",
+        "Days between inspections",
+        "Average inspections per year",
+        "Critical violations in the past 12 months",
+        "Total violations across all inspections",
+        "Count of unique violation types",
+        "Average inspection score over restaurant's history",
+        "Score trajectory over time (positive = worsening)",
+        "Whether grade changed between last two inspections",
+        "Average score for restaurants of this cuisine type",
+        "Average score for restaurants in this ZIP code"
+    ]
+}
+
+df_features = pd.DataFrame(feature_data)
+st.dataframe(
+    df_features,
+    width='stretch',
+    hide_index=True,
+    column_config={
+        "Category": st.column_config.TextColumn("Category", width="small"),
+        "Feature": st.column_config.TextColumn("Feature", width="medium"),
+        "Description": st.column_config.TextColumn("Description", width="large"),
+    }
 )
 
-# Close newspaper-body DIV
 st.markdown('</div>', unsafe_allow_html=True)
+
+# -------------------------------------------------
+#  Model Performance (Dynamic)
+# -------------------------------------------------
 st.markdown("---")
+st.markdown('<h2 style="font-size: 1.75rem;">Model Performance</h2>', unsafe_allow_html=True)
 
-col_res, col_why = st.columns(2)
+if metadata:
+    metrics = metadata.get('training_metrics', {})
 
-with col_res:
-    st.subheader("Final Results")
-    st.markdown(
+    # Metrics row
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Accuracy", f"{metrics.get('accuracy', 0):.1%}")
+    with col2:
+        st.metric("Precision", f"{metrics.get('precision', 0):.1%}")
+    with col3:
+        st.metric("Recall", f"{metrics.get('recall', 0):.1%}")
+    with col4:
+        st.metric("F1 Score", f"{metrics.get('f1', 0):.1%}")
+
+    # Training info
+    st.markdown("---")
+    col_info1, col_info2 = st.columns(2)
+
+    with col_info1:
+        train_samples = metrics.get('train_samples', 'N/A')
+        test_samples = metrics.get('test_samples', 'N/A')
+        st.markdown(f"**Training samples**: {train_samples:,}" if isinstance(train_samples, int) else f"**Training samples**: {train_samples}")
+        st.markdown(f"**Test samples**: {test_samples:,}" if isinstance(test_samples, int) else f"**Test samples**: {test_samples}")
+
+    with col_info2:
+        training_date = metadata.get('training_date', 'Unknown')
+        if training_date != 'Unknown':
+            # Format the ISO date nicely
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(training_date)
+                training_date = dt.strftime("%B %d, %Y at %I:%M %p")
+            except:
+                pass
+        st.markdown(f"**Last trained**: {training_date}")
+        st.markdown(f"**Model type**: {metadata.get('model_type', 'Unknown')}")
+
+    # Feature Importance Chart
+    st.markdown("---")
+    st.subheader("What Drives Predictions?")
+
+    importances = metadata.get('feature_importances', {})
+    if importances:
+        # Human-readable names and categories
+        feature_info = {
+            'grade_stability': ('Grade Consistency', 'History'),
+            'avg_score_historical': ('Historical Avg Score', 'History'),
+            'total_violations_all_time': ('Total Violations', 'Violations'),
+            'inspection_frequency': ('Inspection Frequency', 'History'),
+            'prev_score_1': ('Last Inspection Score', 'History'),
+            'days_since_last_inspection': ('Days Since Inspection', 'History'),
+            'score_trend': ('Score Trend', 'History'),
+            'violation_diversity': ('Violation Types', 'Violations'),
+            'critical_violations_12mo': ('Critical Violations (1yr)', 'Violations'),
+            'prev_score_2': ('Prior Inspection Score', 'History'),
+            'prev_grade_1': ('Last Grade', 'History'),
+            'zipcode_avg_score': ('Neighborhood Avg', 'Location'),
+            'zipcode': ('ZIP Code', 'Location'),
+            'cuisine_avg_score': ('Cuisine Type Avg', 'Restaurant'),
+            'cuisine_description': ('Cuisine Type', 'Restaurant'),
+            'prev_grade_2': ('Prior Grade', 'History'),
+            'borough': ('Borough', 'Location'),
+        }
+
+        # Category colors
+        cat_colors = {'History': '#4A90D9', 'Violations': '#D94A4A', 'Location': '#6B8E23', 'Restaurant': '#9B59B6'}
+
+        # Calculate percentages and sort
+        total = sum(importances.values())
+        sorted_items = sorted(importances.items(), key=lambda x: x[1], reverse=True)
+
+        # Compact two-column layout for top 10
+        col1, col2 = st.columns(2)
+        for i, (feature, importance) in enumerate(sorted_items[:10]):
+            name, cat = feature_info.get(feature, (feature, 'Other'))
+            pct = (importance / total) * 100
+            color = cat_colors.get(cat, '#888')
+
+            with col1 if i % 2 == 0 else col2:
+                st.markdown(
+                    f"<div style='margin-bottom: 8px;'>"
+                    f"<span style='font-weight: 600;'>{name}</span> "
+                    f"<span style='color: {color}; font-size: 0.75em;'>({cat})</span> "
+                    f"<span style='float: right; font-weight: 700;'>{pct:.1f}%</span>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                st.progress(pct / 100)
+
+        # Key insight - compact
+        st.caption(
+            "The model relies most on track record (grade consistency, historical scores, violations) "
+            "rather than location or cuisine type."
+        )
+
+else:
+    st.info(
         """
-        * Logistic regression with food type + Naive Bayes ZIP yields similar accuracy to food type alone.
-        * Logistic regression with food type + **polynomial ZIP code** improves accuracy to **62.4%**.
+        **No model has been trained yet.**
+
+        Train a model on the **Filter** page to see performance metrics and feature importance rankings.
+
+        Once trained, this section will display:
+        * Accuracy, Precision, Recall, and F1 Score
+        * Training and test sample counts
+        * Feature importance visualization
         """
     )
 
-with col_why:
-    st.subheader("Key Insight")
-    st.markdown(
-        """
-        **Why polynomial ZIP works better in combination:**
-
-        The polynomial estimate may be **biased**, but logistic regression corrects this during training through its learned coefficients. This improvement is consistent across multiple train/test splits, showing that the combination of Food Type's strong inherent prediction with the structurally corrected prediction from Polynomial ZIP yields the best final result.
-        """
-    )
+# -------------------------------------------------
+#  Footer
+# -------------------------------------------------
+st.markdown("---")
+st.caption("Data source: NYC Open Data - DOHMH New York City Restaurant Inspection Results")

@@ -36,6 +36,31 @@ def setup_page(title: str = "CleanKitchen NYC", layout: str = "wide"):
     load_css()
 
 
+def render_top_nav():
+    """
+    Render the top navigation bar with brand and page links.
+    Uses st.page_link() for stateless navigation.
+    """
+    # Navigation row: Brand | Nav Links
+    brand_col, nav_col = st.columns([1, 2])
+
+    with brand_col:
+        st.page_link("app.py", label="CleanKitchen NYC", icon=None)
+
+    with nav_col:
+        # Create columns for nav buttons
+        cols = st.columns([1, 1, 1, 2])
+
+        with cols[0]:
+            st.page_link("pages/1_Filter.py", label="Filter")
+
+        with cols[1]:
+            st.page_link("pages/2_About.py", label="About")
+
+        with cols[2]:
+            st.page_link("pages/3_Creators.py", label="Creators")
+
+
 def render_header_divider():
     """Render the horizontal divider after navbar."""
     st.markdown('<div class="header-separator"></div>', unsafe_allow_html=True)

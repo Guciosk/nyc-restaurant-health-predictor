@@ -6,14 +6,66 @@
     color: #000000;
 }
 
+/* Hide the default sidebar navigation */
+[data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
+/* Hide sidebar completely when collapsed */
+[data-testid="stSidebar"][aria-expanded="false"] {
+    display: none !important;
+}
+
 /* Remove top padding to align navbar better */
 .block-container {
-    padding-top: 3rem;
+    padding-top: 3.5rem;
     padding-left: 3rem;
     padding-right: 3rem;
 }
 
-/* 2. NAVBAR STYLING */
+/* 2. TOP NAVIGATION BAR STYLING */
+
+/* Brand link (home) - styled as large text */
+[data-testid="stPageLink"][href="/"] a,
+[data-testid="stPageLink"][href="app.py"] a {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+    font-size: 32px !important;
+    font-weight: 800 !important;
+    color: #000 !important;
+    text-decoration: none !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* Navigation links - pill button style */
+[data-testid="stPageLink"]:not([href="/"]):not([href="app.py"]) a {
+    font-family: sans-serif !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    color: #333 !important;
+    text-decoration: none !important;
+    letter-spacing: 0.5px !important;
+    background-color: transparent !important;
+    border: 1.5px solid #000 !important;
+    border-radius: 30px !important;
+    padding: 8px 24px !important;
+    transition: all 0.3s ease !important;
+    display: inline-block !important;
+}
+
+[data-testid="stPageLink"]:not([href="/"]):not([href="app.py"]) a:hover {
+    background-color: #f0f0f0 !important;
+}
+
+/* Active page indicator */
+[data-testid="stPageLink"][aria-current="page"]:not([href="/"]):not([href="app.py"]) a {
+    background-color: #000 !important;
+    color: #fff !important;
+}
+
+/* Legacy brand class for markdown */
 .brand {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 45px;
@@ -31,7 +83,7 @@
     padding-top: 10px;
 }
 
-/* Change nav-link to be a clickable button-like element */
+/* Legacy nav-link class */
 .nav-link {
     font-family: sans-serif;
     font-size: 20px;

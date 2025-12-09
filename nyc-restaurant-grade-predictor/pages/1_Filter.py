@@ -18,7 +18,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.components import load_css, render_header_divider
+from src.components import load_css, render_top_nav, render_header_divider
 from src.data_loader import get_data, get_raw_data, refresh_data, load_training_data, clear_data_cache
 from src.predictor import predict_restaurant_grade, clear_model_cache, get_model_metadata, model_needs_retraining, ModelNeedsRetrainingError
 from src.feature_engineering import compute_training_features
@@ -38,6 +38,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 load_css()
+
+# --- Top Navigation ---
+render_top_nav()
+render_header_divider()
 
 # --- Load Data ---
 @st.cache_data

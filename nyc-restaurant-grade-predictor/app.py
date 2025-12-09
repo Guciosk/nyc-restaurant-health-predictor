@@ -2,11 +2,11 @@
 CleanKitchen NYC - Landing Page
 
 A Streamlit application for predicting NYC restaurant health inspection grades.
-This is the main entry point and landing page. Use the sidebar to navigate to other pages.
+This is the main entry point and landing page.
 """
 
 import streamlit as st
-from src.components import load_css, render_header_divider
+from src.components import load_css, render_top_nav, render_header_divider
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -17,8 +17,8 @@ st.set_page_config(
 )
 load_css()
 
-# --- Header ---
-st.markdown('<div class="brand">CleanKitchen NYC</div>', unsafe_allow_html=True)
+# --- Top Navigation ---
+render_top_nav()
 render_header_divider()
 
 # --- Hero Section ---
