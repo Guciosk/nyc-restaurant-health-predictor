@@ -67,19 +67,20 @@ st.markdown("""
         display: flex;
         justify-content: center;
         gap: 30px;
-        padding-top: 10px;
+        padding-top: 10
+        px;
     }
 
     /* Change nav-link to be a clickable button-like element */
     .nav-link {
         font-family: sans-serif;
-        font-size: 16px;
+        font-size: 20px;
         font-weight: 600;
         text-transform: uppercase;
         color: #333;
         text-decoration: none;
         letter-spacing: 0.5px;
-        cursor: pointer; /* Indicates it's clickable */
+        cursor: pointer;
         border: none;
         text-border: none !important;
         border-radius: 0px !important;
@@ -337,20 +338,16 @@ with col1:
 
 with col2:
     # Using columns for better alignment and styling control with st.button
-    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([1, 1, 1, 1])
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
 
     # The actual links are now buttons styled to look like text
     with nav_col1:
         if st.button("About", key="nav_about"):
             navigate_to('about') # Navigates to a dummy 'about' page
     with nav_col2:
-        if st.button("Predictor", key="nav_services"):
-            # SERVICES links to the PREDICTION PAGE
-            navigate_to('prediction')
-    with nav_col3:
-        if st.button("Filter", key="nav_filter"):
+        if st.button("Filter/Predictor", key="nav_filter"):
             navigate_to('filter') # Navigates to a dummy 'portfolio' page
-    with nav_col4:
+    with nav_col3:
         if st.button("Blog", key="nav_blog"):
             navigate_to('blog') # Navigates to a dummy 'blog' page
 
@@ -360,227 +357,6 @@ with col3:
 # --- The Horizontal Divider (Always rendered) ---
 st.markdown('<div class="header-separator"></div>', unsafe_allow_html=True)
 
-# --- Content Rendering Logic ---
-
-
-def prediction_page():
-
-    st.title(" Predict Next Inspection Grade")
-    st.subheader("Input Restaurant Data")
-    
-    # -------------------------------------------------
-    # USER INPUT FORM (Centered layout)
-    # -------------------------------------------------
-    
-    # Use columns to center the input fields
-    _, input_col, _ = st.columns([1, 6, 1])
-
-    with input_col:
-        st.markdown("---")
-        
-        # We need options for Borough and Cuisine from the existing data
-        boroughs = sorted(df["borough"].dropna().unique().tolist())
-        cuisine_list = sorted(df["cuisine_description"].dropna().unique().tolist())
-        
-        # Row 1: Location and Name
-        col1, col2 = st.columns(2)
-        with col1:
-            # 1. Name/DBA (for display only)
-            dba_input = st.text_input("Restaurant Name", "Hypothetical Eatery")
-            # 2. Borough (Categorical input)
-            borough_choice = st.selectbox("Borough", boroughs, index=boroughs.index('Manhattan') if 'Manhattan' in boroughs else 0)
-        with col2:
-            # 3. ZIP Code (Numerical/Categorical input)
-            zipcode_input = st.text_input("ZIP Code", "10001")
-            # 4. Cuisine (Categorical input)
-            cuisine_choice = st.selectbox("Cuisine Type", cuisine_list, index=cuisine_list.index('American') if 'American' in cuisine_list else 0)
-
-        # Row 2: Inspection Status (Actionable features used in the ML model)
-        st.markdown("### Latest Inspection Status *(If Applicable)*")
-        col3, col4 = st.columns(2)
-        with col3:
-            # 5. Last Inspection Score (Numerical input)
-            # This is a critical feature often used for prediction
-            score_input = st.number_input(
-                "Last Inspection Score", 
-                min_value=0, 
-                max_value=100, 
-                value=10, 
-                help="A lower score is better (A: 0-13, B: 14-27, C: 28+)"
-            )
-        with col4:
-            # 6. Days Since Last Inspection (Numerical/Temporal feature)
-            # This is essential for predicting the likelihood of the *next* inspection.
-            days_since_input = st.number_input(
-                "Days Since Last Inspection", 
-                min_value=0, 
-                max_value=730, # Max two years
-                value=100, 
-                help="Enter the number of days since the restaurant was last inspected."
-            )
-            
-        st.markdown("---")
-
-        if st.button("Predict Next Inspection Grade", width='stretch'):
-            with st.spinner(f"Analyzing {dba_input} data..."):
-                
-                # -----------------------------------------------------------------
-                # STEP 1: CONSTRUCT THE MOCK INPUT ROW
-                # The model requires a row (pd.Series) with specific column names.
-                # We need to map user inputs to the feature names the model expects.
-                # NOTE: This only works if your 'row_to_model_input' function can 
-                # handle a minimally populated Series/DataFrame row.
-                # -----------------------------------------------------------------
-                
-                mock_input_data = {
-                    'DBA': dba_input, # Display only
-                    'dba': dba_input, # Display only
-                    'borough': borough_choice,
-                    'zipcode': zipcode_input,
-                    'cuisine_description': cuisine_choice,
-                    'score': score_input,
-                    # We assume the model expects this explicit feature:
-                    'days_since_last_inspection': days_since_input, 
-                    
-                    # Add placeholders for other fields needed by the feature pipeline 
-                    # (e.g., date, grade, camis are often required by 'row_to_model_input')
-                    'inspection_date': datetime.now() - pd.Timedelta(days=days_since_input),
-                    'grade': 'Z', # Placeholder for prediction target
-                    'camis': '00000000',
-                    'latitude': 40.7, # Dummy location
-                    'longitude': -74.0, # Dummy location
-                    'street': 'User Input'
-                }
-                
-                # Create a single-row DataFrame (or Series)
-                selected_row = pd.Series(mock_input_data)
-
-
-                try:
-                    # -----------------------------------------------------------------
-                    # STEP 2: PREDICT GRADE (Algorithm Pipelining Kept Intact)
-                    # -----------------------------------------------------------------
-                    
-                    # Build model input (this is where feature engineering happens implicitly)
-                    model_input = row_to_model_input(selected_row)
-                    result = predict_restaurant_grade(model_input)
-
-                    predicted_grade = result["grade"]
-                    probabilities = result["probabilities"]
-                    formatted_probs = format_probabilities(probabilities)
-
-                    # Get current inspection info (from user input for status checks)
-                    current_score = score_input
-                    
-                    # ... [Derived Grade, Time Estimate, and Display Logic remains the same] ...
-                    
-                    # --- DERIVED STATUS LOGIC (Copied from original) ---
-                    # Derive grade from score for status info
-                    derived_grade = None
-                    if current_score <= 13:
-                        derived_grade = 'A'
-                    elif current_score <= 27:
-                        derived_grade = 'B'
-                    else:
-                        derived_grade = 'C'
-                    grade_status = f"{derived_grade} (Current Status)"
-                    
-                    # Calculate expected time to next inspection
-                    days_since = days_since_input
-                    median_interval = 124 
-                    
-                    if days_since > 365:
-                        years_ago = round(days_since / 365, 1)
-                        time_estimate = f"Last inspected {years_ago:.0f}+ years ago"
-                    elif days_since > median_interval:
-                        time_estimate = "Overdue for inspection"
-                    elif days_since > median_interval - 30:
-                        time_estimate = "Due within ~1 month"
-                    elif days_since > median_interval - 60:
-                        time_estimate = "Expected in ~2 months"
-                    elif days_since > median_interval - 90:
-                        time_estimate = "Expected in ~3 months"
-                    else:
-                        months = round((median_interval - days_since) / 30)
-                        time_estimate = f"Expected in ~{months} months"
-
-                    # --- DISPLAY RESULTS ---
-                    pred_color = get_grade_color(predicted_grade)
-                    
-                    st.markdown("### Prediction Results")
-
-                    # Current Status Card (based on user score)
-                    st.markdown(f"""
-                    <div class="info-card" style="text-align: center;">
-                        <p style="font-size: 0.85rem; margin-bottom: 0.5rem; color: #6C757D;">
-                            CURRENT DERIVED GRADE STATUS (Score: {current_score})
-                        </p>
-                        <div class="grade-badge grade-{derived_grade}" style="margin: 0 auto; background: {get_grade_color(derived_grade)};">
-                            {derived_grade}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Next inspection prediction card
-                    st.markdown(f"""
-                    <div class="info-card" style="text-align: center; border: 2px solid {pred_color}; margin-top: 1rem;">
-                        <p style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #6C757D; text-transform: uppercase;">
-                            Predicted Grade on Next Inspection
-                        </p>
-                        <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">
-                            {time_estimate}
-                        </p>
-                        <div class="grade-badge grade-{predicted_grade}" style="margin: 0 auto;">
-                            {predicted_grade}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    st.markdown("#### Confidence by Grade")
-                    for g, p in formatted_probs:
-                        grade_color = get_grade_color(g)
-                        st.markdown(f"""
-                        <div style="margin-bottom: 8px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                                <span>Grade {g}</span>
-                                <span style="font-weight: 500;">{p:.1f}%</span>
-                            </div>
-                            <div style="background: #E9ECEF; border-radius: 4px; height: 6px; overflow: hidden;">
-                                <div style="background: {grade_color}; width: {p}%; height: 100%; border-radius: 4px;"></div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    # Historical context
-                    if derived_grade == 'C' or current_score >= 28:
-                        st.markdown("""
-                        <div style="background: #F8F9FA; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; color: #6C757D;">
-                            <strong>Historical Pattern:</strong> 64% of restaurants that fail an inspection
-                            pass their re-inspection within ~4 months after addressing violations.
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                except ModelNeedsRetrainingError:
-                    st.error("Model needs retraining. Please check the **Data Management** page.")
-                except Exception as e:
-                    st.error(f"Error making prediction: {e}")
-
-    
-    st.markdown("---")
-    st.markdown("#### Management Actions (Kept for functionality)")
-    col_data, col_model = st.columns(2)
-    with col_data:
-        if st.button("🔄 Fetch Fresh Data"):
-             # Original data fetch logic would go here
-             pass
-    with col_model:
-        if st.button("🧠 Retrain Model"):
-             # Original retraining logic would go here
-             pass
-
-    # Note: The original logic for model training and data fetching is complex. 
-    # For a final app, these blocks should be placed on a separate "Data Management" page 
-    # as they cause the app to rerun and clutter the main prediction interface.
 
 def home_page():
     """Renders the content for the Home Page (your original design)."""
@@ -632,17 +408,7 @@ def home_page():
     )
 def filter_page():
     
-    st.initial_sidebar_state="expanded"
-
-    if df.empty:
-        st.error("No data loaded. Please check your CSV files in the data/ folder.")
-        st.stop()
-
-
-    # -------------------------------------------------
-    # SIDEBAR FILTERS
-    # -------------------------------------------------
-    st.sidebar.header(" Filter Restaurants")
+    st.sidebar.header("Filter Restaurants")
 
     # Borough filter
     boroughs = ["All"] + sorted(df["borough"].dropna().unique().tolist())
@@ -683,7 +449,101 @@ def filter_page():
     </div>
     """, unsafe_allow_html=True)
 
-    
+
+    # -------------------------------------------------
+    # Data Management (sidebar)
+    # -------------------------------------------------
+    st.sidebar.divider()
+    st.sidebar.caption("Data Management")
+    if st.sidebar.button("🔄 Fetch Fresh Data"):
+        with st.spinner("Fetching latest data from NYC Open Data API... This may take 1-2 minutes."):
+            success, message, count = refresh_data()
+            if success:
+                st.sidebar.success(f"{message} ({count:,} records)")
+                st.cache_data.clear()
+                st.rerun()
+            else:
+                st.sidebar.error(message)
+
+
+    # -------------------------------------------------
+    # Model Management (sidebar)
+    # -------------------------------------------------
+    st.sidebar.divider()
+    st.sidebar.caption("Model Management")
+
+    # Show current model info
+    try:
+        metadata = get_model_metadata()
+        training_date = metadata.get("training_date", "Unknown")
+        if training_date != "Unknown":
+            # Parse ISO format date
+            try:
+                dt = datetime.fromisoformat(training_date)
+                training_date = dt.strftime("%Y-%m-%d %H:%M")
+            except:
+                pass
+        metrics = metadata.get("training_metrics", {})
+        accuracy = metrics.get("accuracy")
+        if accuracy:
+            st.sidebar.markdown(f"**Last trained:** {training_date}")
+            st.sidebar.markdown(f"**Accuracy:** {accuracy:.1%}")
+        else:
+            st.sidebar.markdown("**Model:** Not yet trained with new features")
+    except Exception:
+        st.sidebar.markdown("**Model:** Ready for training")
+
+    # Training button
+    if st.sidebar.button("🧠 Retrain Model"):
+        with st.sidebar:
+            progress_bar = st.progress(0, text="Loading training data...")
+
+            try:
+                # Step 1: Load raw data
+                progress_bar.progress(10, text="Loading raw inspection data...")
+                raw_df = load_training_data()
+
+                # Step 2: Compute features (using training-specific function for correct temporal alignment)
+                progress_bar.progress(30, text="Computing training features...")
+                feature_df = compute_all_features(raw_df)
+
+                # Step 3: Train model
+                progress_bar.progress(50, text="Training model...")
+                model, metrics, feature_importances, encoders = train_model(feature_df)
+
+                # Step 4: Save model
+                progress_bar.progress(80, text="Saving model...")
+                save_model(model, encoders, metrics, feature_importances)
+
+                # Step 5: Clear caches
+                progress_bar.progress(90, text="Clearing caches...")
+                clear_model_cache()
+                clear_data_cache()
+
+                progress_bar.progress(100, text="Complete!")
+
+                # Show results
+                st.success("Model trained successfully!")
+                st.markdown(f"""
+                **Training Results:**
+                - Accuracy: {metrics['accuracy']:.1%}
+                - Precision: {metrics['precision']:.1%}
+                - Recall: {metrics['recall']:.1%}
+                - F1 Score: {metrics['f1']:.1%}
+                - Training samples: {metrics['train_samples']:,}
+                """)
+
+                # Show top feature importances
+                st.markdown("**Top Features:**")
+                top_features = get_feature_importance_ranking(feature_importances)[:5]
+                for name, importance in top_features:
+                    st.markdown(f"- {name}: {importance:.3f}")
+
+            except Exception as e:
+                st.error(f"Training failed: {e}")
+
+    st.sidebar.caption("Training takes ~30 seconds")
+
 
     # -------------------------------------------------
     # MAIN LAYOUT: Map (left) + Details/Prediction (right)
@@ -809,7 +669,7 @@ def filter_page():
             labels = [make_label(i) for i in options]
 
             selected_idx = st.selectbox(
-                "Choose a restaurant :",
+                "Choose a restaurant to analyze:",
                 options=options,
                 format_func=lambda i: labels[i]
             )
@@ -922,65 +782,116 @@ def filter_page():
                         '</div>'
                     )
                     st.markdown(history_html, unsafe_allow_html=True)
-                    
-                    GRADE_COLORS = {
-                        'A': '#7DB87D',  # Green
-                        'B': '#E8C84A',  # Yellow
-                        'C': '#8B3A3A',  # Dark Orange/Red
-                        'P': '#9BA8C4',  # Pending (Grey/Blue)
-                        'N/A': '#D4956A' # Tan
-                    }
 
-                    # Define the desired order of grades for the pie chart
-                    GRADE_ORDER = ['A', 'B', 'C', 'P', 'N/A']
-                    
-                    if len(df_filtered) > 0:
-                        # Count grades, filling NaN with 'N/A'
-                        grade_counts = df_filtered['grade'].fillna('N/A').value_counts()
-                        
-                        # 1. Reindex the series to enforce the desired order
-                        grade_counts = grade_counts.reindex(GRADE_ORDER, fill_value=0)
-                        # Remove grades that are not present in the data (count is 0)
-                        grade_counts = grade_counts[grade_counts > 0]
+            # Check if model needs retraining
+            if model_needs_retraining():
+                st.warning(
+                    "**Model needs to be trained.** The prediction model has been updated with new features. "
+                    "Please click **'Retrain Model'** in the sidebar to train the model before making predictions."
+                )
 
-                        # 2. Map colors to the grades present in the counts
-                        labels = grade_counts.index.tolist()
-                        sizes = grade_counts.values
-                        colors = [GRADE_COLORS.get(grade, GRADE_COLORS['N/A']) for grade in labels]
+            if st.button("Predict Next Inspection", width='stretch'):
+                with st.spinner("Analyzing restaurant data..."):
+                    try:
+                        # Build model input
+                        model_input = row_to_model_input(selected_row)
+                        result = predict_restaurant_grade(model_input)
 
-                        # PIE CHART setup (Increased figure size for better legend placement)
-                        fig1, ax1 = plt.subplots(figsize=(4, 4)) 
+                        predicted_grade = result["grade"]
+                        probabilities = result["probabilities"]
+                        formatted_probs = format_probabilities(probabilities)
 
-                        # 3. Draw the pie chart with colors and autopct, but no labels on slices
-                        wedges, texts, autotexts = ax1.pie(
-                            sizes,
-                            autopct='%1.1f%%',
-                            startangle=90,
-                            colors=colors,
-                            textprops={'fontsize': 10, 'color': 'black'} 
+                        # Get current inspection info
+                        current_score = selected_row.get('score')
+                        current_grade = selected_row.get('grade')
+
+                        # Derive grade from score if official grade not available
+                        if pd.isna(current_grade) or current_grade not in ['A', 'B', 'C']:
+                            if pd.notna(current_score):
+                                if current_score <= 13:
+                                    derived_grade = 'A'
+                                elif current_score <= 27:
+                                    derived_grade = 'B'
+                                else:
+                                    derived_grade = 'C'
+                                grade_status = f"{derived_grade} (pending)"
+                            else:
+                                derived_grade = None
+                                grade_status = "Pending"
+                        else:
+                            derived_grade = current_grade
+                            grade_status = current_grade
+
+                        # Calculate expected time to next inspection
+                        days_since = selected_row.get('days_since_last_inspection', 0)
+                        if pd.isna(days_since):
+                            days_since = 0
+
+                        median_interval = 124  # median days between inspections
+
+                        # Handle stale data (no inspection in over a year)
+                        if days_since > 365:
+                            years_ago = round(days_since / 365, 1)
+                            time_estimate = f"Last inspected {years_ago:.0f}+ years ago"
+                        elif days_since > median_interval:
+                            time_estimate = "Overdue for inspection"
+                        elif days_since > median_interval - 30:
+                            time_estimate = "Due within ~1 month"
+                        elif days_since > median_interval - 60:
+                            time_estimate = "Expected in ~2 months"
+                        elif days_since > median_interval - 90:
+                            time_estimate = "Expected in ~3 months"
+                        else:
+                            months = round((median_interval - days_since) / 30)
+                            time_estimate = f"Expected in ~{months} months"
+
+                        # Next inspection prediction card
+                        pred_color = get_grade_color(predicted_grade)
+                        st.markdown(f"""
+                        <div class="info-card" style="text-align: center; border: 2px solid {pred_color};">
+                            <p style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #6C757D; text-transform: uppercase;">
+                                Predicted Next Inspection
+                            </p>
+                            <p style="font-size: 0.7rem; color: #888; margin-bottom: 8px;">
+                                {time_estimate}
+                            </p>
+                            <div class="grade-badge grade-{predicted_grade}" style="margin: 0 auto;">
+                                {predicted_grade}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        st.markdown("#### Confidence by Grade")
+                        for g, p in formatted_probs:
+                            grade_color = get_grade_color(g)
+                            st.markdown(f"""
+                            <div style="margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>Grade {g}</span>
+                                    <span style="font-weight: 500;">{p:.1f}%</span>
+                                </div>
+                                <div style="background: #E9ECEF; border-radius: 4px; height: 6px; overflow: hidden;">
+                                    <div style="background: {grade_color}; width: {p}%; height: 100%; border-radius: 4px;"></div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                        # Historical context
+                        if derived_grade == 'C' or (pd.notna(current_score) and current_score >= 28):
+                            st.markdown("""
+                            <div style="background: #F8F9FA; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; color: #6C757D;">
+                                <strong>Historical Pattern:</strong> 64% of restaurants that fail an inspection
+                                pass their re-inspection within ~4 months after addressing violations.
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    except ModelNeedsRetrainingError:
+                        st.error(
+                            "**Model needs retraining.** Please click 'Retrain Model' in the sidebar first."
                         )
-                        
-                        # 4. Create the legend next to the pie chart
-                        ax1.legend(
-                            wedges, 
-                            labels,
-                            title="Grade",
-                            loc="center left", 
-                            bbox_to_anchor=(1.0, 0, 0.5, 1), # Positions the legend outside to the right
-                            fontsize=10
-                        )
-
-                        ax1.axis('equal') # Ensures the pie chart is a circle
-                        ax1.set_title("Grade Distribution", fontsize=12) 
-
-                        # 5. Render the figure in Streamlit
-                        st.pyplot(fig1)
-                        plt.close(fig1)
-                            
-
-                    else:
-                        st.info("No data available to display grade distribution charts.")
-                                        
+                    except Exception as e:
+                        st.error(f"Error making prediction: {e}")
+                                      
 def render_member_card(name, college, major, linkedin_url, image_url, github_url):
     """Generates the HTML/Markdown for a single team member card."""
     
@@ -1263,8 +1174,6 @@ def about_page():
 # --- Page Router ---
 if st.session_state.page == 'home':
     home_page()
-elif st.session_state.page == 'prediction':
-    prediction_page()
 elif st.session_state.page == 'filter':
     filter_page()
 elif st.session_state.page == 'blog':
