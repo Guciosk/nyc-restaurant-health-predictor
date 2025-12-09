@@ -286,6 +286,124 @@ def compute_violation_diversity(df: pd.DataFrame) -> pd.Series:
     return diversity.rename('violation_diversity').fillna(0).astype(int)
 
 
+def compute_training_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute features for training with correct temporal alignment.
+
+    Creates MULTIPLE rows per restaurant - one for each inspection where we have
+    a NEXT inspection to use as target. This ensures the model learns to predict
+    the NEXT inspection from CURRENT data.
+
+    For each training row:
+    - Features are computed from inspection at time T and earlier
+    - Target (target_grade) is from inspection at time T+1 (the next one)
+    - prev_score_1 = score at time T (current inspection)
+    - prev_score_2 = score at time T-1 (previous inspection)
+
+    Args:
+        df: Raw inspection DataFrame with multiple rows per restaurant
+
+    Returns:
+        DataFrame with multiple rows per restaurant, each predicting the next inspection
+    """
+    # Ensure inspection_date is datetime
+    if df['inspection_date'].dtype == 'object':
+        df = df.copy()
+        df['inspection_date'] = pd.to_datetime(df['inspection_date'], errors='coerce')
+
+    # Filter to inspections with valid grades (these can be targets)
+    graded = df[df['grade'].isin(['A', 'B', 'C'])].copy()
+
+    # Sort chronologically and dedupe by restaurant+date
+    graded = graded.sort_values(['camis', 'inspection_date'], ascending=[True, True])
+    graded = graded.drop_duplicates(subset=['camis', 'inspection_date'])
+
+    # Add inspection number within each restaurant (1 = oldest)
+    graded['insp_num'] = graded.groupby('camis').cumcount() + 1
+    graded['total_insps'] = graded.groupby('camis')['camis'].transform('count')
+
+    # Shift to get next inspection's data (the target we're predicting)
+    graded['target_grade'] = graded.groupby('camis')['grade'].shift(-1)
+    graded['next_score'] = graded.groupby('camis')['score'].shift(-1)
+    graded['next_date'] = graded.groupby('camis')['inspection_date'].shift(-1)
+
+    # Also get previous inspection's data for prev_score_2 and prev_grade_2
+    graded['prev_score_2'] = graded.groupby('camis')['score'].shift(1)
+    graded['prev_grade_2'] = graded.groupby('camis')['grade'].shift(1)
+
+    # Filter to rows that have a next inspection (exclude most recent per restaurant)
+    training_rows = graded[graded['target_grade'].notna()].copy()
+
+    if len(training_rows) == 0:
+        raise ValueError("No valid training pairs found (need restaurants with 2+ inspections)")
+
+    # Current inspection's score/grade becomes prev_score_1/prev_grade_1
+    training_rows['prev_score_1'] = training_rows['score']
+    training_rows['prev_grade_1'] = training_rows['grade']
+
+    # Compute days until next inspection (for training, this is known)
+    training_rows['days_since_last_inspection'] = (
+        training_rows['next_date'] - training_rows['inspection_date']
+    ).dt.days
+
+    # Select base columns
+    base_cols = ['camis', 'dba', 'borough', 'zipcode', 'cuisine_description',
+                 'latitude', 'longitude', 'inspection_date']
+    base_cols = [c for c in base_cols if c in training_rows.columns]
+
+    result = training_rows[base_cols + [
+        'target_grade', 'prev_score_1', 'prev_score_2',
+        'prev_grade_1', 'prev_grade_2', 'days_since_last_inspection'
+    ]].copy()
+
+    # Compute inspection frequency up to each inspection date
+    # For efficiency, compute once per restaurant and use the overall frequency
+    frequency = compute_inspection_frequency(df)
+    result = result.merge(frequency.reset_index(), on='camis', how='left')
+
+    # Compute violation counts (using all historical data for now - could be improved)
+    violation_counts = compute_violation_counts(df)
+    result = result.merge(violation_counts, on='camis', how='left')
+
+    # Compute avg_score_historical (using all data)
+    avg_score = compute_avg_score_historical(df)
+    result = result.merge(avg_score.reset_index(), on='camis', how='left')
+
+    # Compute score trend
+    trend = compute_score_trend(df)
+    result = result.merge(trend.reset_index(), on='camis', how='left')
+
+    # Compute grade stability
+    stability = compute_grade_stability(df)
+    result = result.merge(stability.reset_index(), on='camis', how='left')
+
+    # Compute context averages
+    context = compute_context_averages(df)
+    result = result.merge(context, on='camis', how='left')
+
+    # Compute violation diversity
+    diversity = compute_violation_diversity(df)
+    result = result.merge(diversity.reset_index(), on='camis', how='left')
+
+    # Fill missing values with sensible defaults
+    result['inspection_frequency'] = result['inspection_frequency'].fillna(1.0)
+    result['prev_grade_1'] = result['prev_grade_1'].fillna('Unknown')
+    result['prev_grade_2'] = result['prev_grade_2'].fillna('Unknown')
+    result['prev_score_1'] = result['prev_score_1'].fillna(13.0)
+    result['prev_score_2'] = result['prev_score_2'].fillna(result['prev_score_1'])
+    result['critical_violations_12mo'] = result['critical_violations_12mo'].fillna(0)
+    result['total_violations_all_time'] = result['total_violations_all_time'].fillna(1)
+    result['avg_score_historical'] = result['avg_score_historical'].fillna(result['prev_score_1'])
+    result['score_trend'] = result['score_trend'].fillna(0.0)
+    result['grade_stability'] = result['grade_stability'].fillna(1)
+    result['cuisine_avg_score'] = result['cuisine_avg_score'].fillna(result['prev_score_1'])
+    result['zipcode_avg_score'] = result['zipcode_avg_score'].fillna(result['prev_score_1'])
+    result['violation_diversity'] = result['violation_diversity'].fillna(1)
+    result['days_since_last_inspection'] = result['days_since_last_inspection'].fillna(0)
+
+    return result
+
+
 def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute all engineered features from raw inspection data.
