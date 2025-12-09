@@ -22,8 +22,8 @@ render_top_nav()
 render_header_divider()
 
 # --- Hero Section ---
-st.markdown('<div class="hero-sub">Health Predicting/Filtering - NYC</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-title">Healthier Food<br>for NYC</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-sub">Inspect. Predict. Dine Safer.</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">Safer Eats<br>for NYC</div>', unsafe_allow_html=True)
 
 # Get Started button
 col1, col2 = st.columns([2, 8])
