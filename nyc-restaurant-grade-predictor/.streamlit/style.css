@@ -16,7 +16,7 @@
 /* 2. NAVBAR STYLING */
 .brand {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 50px;
+    font-size: 45px;
     font-weight: 800;
     color: #000;
     text-decoration: none;
@@ -39,7 +39,7 @@
     text-transform: uppercase;
     color: #333;
     text-decoration: none;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     cursor: pointer;
     border: none;
     border-radius: 0px !important;
@@ -51,7 +51,7 @@
     color: black !important;
     border: 1px solid #000 !important;
     border-radius: 30px !important;
-    padding: 5px 25px !important;
+    padding: 10px 25px !important;
     font-weight: 700 !important;
     transition: all 0.3s ease;
     font-size: 20px !important;
@@ -80,8 +80,8 @@
 /* 4. HEADER DIVIDER (The horizontal line) */
 .header-separator {
     border-bottom: 1px solid #E0E0E0;
-    margin-top: 10px;
-    margin-bottom: 40px;
+    margin-top: 3px;
+    margin-bottom: 20px;
 }
 
 /* Hero Text */
@@ -180,7 +180,7 @@
     align-items: center;
     gap: 30px;
     max-width: 750px;
-    margin: 30px auto;
+    margin: 20px auto;
 }
 
 .profile-img {
